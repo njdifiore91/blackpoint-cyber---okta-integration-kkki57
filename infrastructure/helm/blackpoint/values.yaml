@@ -1,0 +1,117 @@
+# Global configuration values shared across all components
+global:
+  # Container image configuration
+  image:
+    registry: blackpoint
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  # Security configuration
+  security:
+    # Pod security context settings
+    runAsUser: 1000
+    runAsGroup: 2000
+    fsGroup: 2000
+    readOnlyRootFilesystem: true
+    allowPrivilegeEscalation: false
+    runAsNonRoot: true
+    
+    # Encryption configuration
+    encryption:
+      enabled: true
+      provider: aws-kms
+      keyRotationPeriod: "30d"
+
+  # Monitoring and observability configuration
+  monitoring:
+    enabled: true
+    prometheus:
+      enabled: true
+      scrapeInterval: "10s"
+      alerting:
+        enabled: true
+        rules:
+          - HighCPUUsage
+          - HighMemoryUsage
+          - HighLatency
+    logging:
+      enabled: true
+      provider: elasticsearch
+      retention: "30d"
+    metrics:
+      custom:
+        eventProcessingRate: true
+        processingLatency: true
+        errorRate: true
+
+# Security Analyzer component configuration
+analyzer:
+  replicaCount: 3
+  resources:
+    limits:
+      cpu: "6"
+      memory: "12Gi"
+    requests:
+      cpu: "4"
+      memory: "8Gi"
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 75
+    targetMemoryUtilizationPercentage: 75
+  service:
+    type: ClusterIP
+    port: 8080
+    metricsPort: 9090
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: "kubernetes.io/hostname"
+
+# Event Collector component configuration
+collector:
+  replicaCount: 3
+  resources:
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+    requests:
+      cpu: "2"
+      memory: "4Gi"
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 15
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 70
+  service:
+    type: ClusterIP
+    port: 8080
+    metricsPort: 9090
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: "kubernetes.io/hostname"
+
+# Event Normalizer component configuration
+normalizer:
+  replicaCount: 3
+  resources:
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+    requests:
+      cpu: "2"
+      memory: "4Gi"
+  bufferConfig:
+    memoryLimit: "2Gi"
+    flushInterval: "5s"
+  service:
+    type: ClusterIP
+    port: 8080
+    metricsPort: 9090
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        - topologyKey: "kubernetes.io/hostname"
