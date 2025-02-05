@@ -1,0 +1,199 @@
+.TH BLACKPOINT-INTEGRATION 1 "January 2024" "BlackPoint Security" "BlackPoint CLI Manual"
+.SH NAME
+blackpoint-integration \- securely manage security platform integrations in BlackPoint Security Framework
+.SH SYNOPSIS
+.B blackpoint integration
+[\fIcommand\fR] [\fIoptions\fR]
+.PP
+.B blackpoint integration new
+[\fB\-\-platform\fR=\fIplatform\fR]
+[\fB\-\-config\fR=\fIconfig_file\fR]
+[\fB\-\-environment\fR=\fIenv\fR]
+[\fB\-\-security-level\fR=\fIlevel\fR]
+.PP
+.B blackpoint integration list
+[\fB\-\-output\fR=\fIformat\fR]
+[\fB\-\-filter\fR=\fIcriteria\fR]
+.PP
+.B blackpoint integration delete
+\fIintegration-id\fR
+[\fB\-\-force\fR]
+[\fB\-\-audit\fR]
+.PP
+.B blackpoint integration status
+\fIintegration-id\fR
+[\fB\-\-verbose\fR]
+[\fB\-\-security-check\fR]
+.PP
+.B blackpoint integration validate
+\fIconfig_file\fR
+[\fB\-\-strict\fR]
+.PP
+.B blackpoint integration rotate-keys
+\fIintegration-id\fR
+[\fB\-\-immediate\fR]
+.SH DESCRIPTION
+The integration command provides comprehensive management of security platform integrations within the BlackPoint Security Integration Framework. It implements strict security controls and validation for all operations.
+.PP
+.B Security Features:
+.RS
+.IP \[bu] 2
+Multi-factor authentication support
+.IP \[bu]
+Automatic key rotation (every 90 days)
+.IP \[bu]
+Comprehensive audit logging
+.IP \[bu]
+Role-based access control
+.IP \[bu]
+Secure credential storage using AWS KMS
+.RE
+.PP
+.B Integration Capabilities:
+.RS
+.IP \[bu] 2
+Real-time and batch collection modes
+.IP \[bu]
+Multiple authentication methods (OAuth2, API keys, certificates)
+.IP \[bu]
+Configurable event types and filtering
+.IP \[bu]
+Environment-specific settings
+.IP \[bu]
+Performance monitoring and health checks
+.RE
+.SH OPTIONS
+.SS General Options
+.TP
+.BR \-\-platform =\fIplatform\fR
+Security platform type (aws, azure, okta, etc.). Required for new integrations.
+.TP
+.BR \-\-config =\fIconfig_file\fR
+Path to YAML configuration file. File permissions are validated (0600).
+.TP
+.BR \-\-environment =\fIenv\fR
+Deployment environment (production, staging, development). Defaults to development.
+.TP
+.BR \-\-security-level =\fIlevel\fR
+Security requirements level (standard, high, maximum). Defaults to standard.
+.TP
+.BR \-\-audit
+Enable detailed audit logging (recommended for production).
+.SS Security Options
+.TP
+.BR \-\-rotate-keys
+Rotate integration authentication credentials.
+.TP
+.BR \-\-immediate
+Apply key rotation immediately instead of scheduled.
+.TP
+.BR \-\-security-check
+Perform comprehensive security validation.
+.SH SECURITY CONSIDERATIONS
+.SS Authentication
+.IP \[bu] 2
+OAuth 2.0 with PKCE for web-based authentication
+.IP \[bu]
+API keys with automatic 90-day rotation
+.IP \[bu]
+Certificate-based authentication with TLS 1.3
+.IP \[bu]
+HMAC request signing for webhooks
+.SS Data Protection
+.IP \[bu] 2
+All sensitive data encrypted at rest using AWS KMS
+.IP \[bu]
+TLS 1.3 required for all connections
+.IP \[bu]
+Secure credential storage with strict permissions
+.IP \[bu]
+Field-level encryption for sensitive data
+.SH EXAMPLES
+Create new integration with high security:
+.PP
+.nf
+.RS
+$ blackpoint integration new \\
+    --platform=aws \\
+    --config=aws-config.yaml \\
+    --security-level=high \\
+    --audit
+.RE
+.fi
+.PP
+List integrations with security status:
+.PP
+.nf
+.RS
+$ blackpoint integration list \\
+    --output=json \\
+    --filter=security-status
+.RE
+.fi
+.PP
+Rotate integration credentials:
+.PP
+.nf
+.RS
+$ blackpoint integration rotate-keys \\
+    12345678-90ab-cdef-1234-567890abcdef \\
+    --immediate
+.RE
+.fi
+.PP
+Validate configuration security:
+.PP
+.nf
+.RS
+$ blackpoint integration validate config.yaml --strict
+.RE
+.fi
+.SH ENVIRONMENT
+.TP
+.B BLACKPOINT_CONFIG
+Configuration directory path (default: ~/.blackpoint/config.yaml)
+.TP
+.B BLACKPOINT_ENV
+Deployment environment setting
+.TP
+.B BLACKPOINT_LOG_LEVEL
+Logging verbosity (default: info)
+.TP
+.B BLACKPOINT_SECURITY_LEVEL
+Default security level for operations
+.SH FILES
+.TP
+.I ~/.blackpoint/config.yaml
+Default configuration file location
+.TP
+.I ~/.blackpoint/credentials
+Encrypted credentials store
+.TP
+.I ~/.blackpoint/logs/audit.log
+Security audit log file
+.SH DIAGNOSTICS
+Exit status:
+.TP
+.B 0
+Success
+.TP
+.B 1
+General error
+.TP
+.B 2
+Configuration error
+.TP
+.B 3
+API communication error
+.SH BUGS
+Report bugs to: support@blackpoint.com
+.SH AUTHOR
+BlackPoint Security <support@blackpoint.com>
+.SH COPYRIGHT
+Copyright \(co 2024 BlackPoint Security. All rights reserved.
+.SH SEE ALSO
+.BR blackpoint (1),
+.BR blackpoint-auth (1),
+.BR blackpoint-config (1),
+.BR blackpoint-monitor (1),
+.BR blackpoint-security (1)
