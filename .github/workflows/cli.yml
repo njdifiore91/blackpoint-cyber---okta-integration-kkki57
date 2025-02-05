@@ -1,0 +1,207 @@
+name: CLI CI/CD
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  GO_VERSION: '1.21'
+  DOCKER_REGISTRY: aws.ecr.region.amazonaws.com
+  IMAGE_NAME: blackpoint-cli
+  MIN_COVERAGE: '85'
+  SECURITY_SCAN_LEVEL: 'HIGH'
+  PROMETHEUS_ENDPOINT: 'http://prometheus:9090'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+  security-events: write
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install dependencies
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Run security validation
+        run: |
+          chmod +x ./scripts/build.sh
+          ./scripts/build.sh validate_security
+
+      - name: Run unit tests with coverage
+        run: |
+          chmod +x ./scripts/test.sh
+          ./scripts/test.sh run_unit_tests
+        env:
+          TEST_COVERAGE_THRESHOLD: ${{ env.MIN_COVERAGE }}
+          SECURITY_CONTEXT_FILE: ./security/context.yaml
+          PROMETHEUS_ENDPOINT: ${{ env.PROMETHEUS_ENDPOINT }}
+
+      - name: Run integration tests
+        run: |
+          ./scripts/test.sh run_integration_tests
+        env:
+          TEST_TIMEOUT: "10m"
+          MAX_CONCURRENT_TESTS: 4
+
+      - name: Build CLI binary
+        run: |
+          ./scripts/build.sh build_binary
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: blackpoint-cli
+          path: bin/blackpoint-cli*
+          retention-days: 7
+
+      - name: Generate security report
+        run: |
+          ./scripts/build.sh generate_security_report
+        env:
+          SECURITY_SCAN_LEVEL: ${{ env.SECURITY_SCAN_LEVEL }}
+
+  docker:
+    name: Docker Build and Scan
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: blackpoint-cli
+          path: bin/
+
+      - name: Run Snyk container scan
+        uses: snyk/actions/docker@v3
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          image: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}
+          args: --severity-threshold=${{ env.SECURITY_SCAN_LEVEL }}
+
+      - name: Run Trivy vulnerability scan
+        uses: aquasecurity/trivy-action@v1
+        with:
+          image-ref: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: ${{ env.SECURITY_SCAN_LEVEL }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  release:
+    name: Create Release
+    needs: docker
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    timeout-minutes: 15
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: blackpoint-cli
+          path: bin/
+
+      - name: Verify security signatures
+        run: |
+          chmod +x ./scripts/build.sh
+          ./scripts/build.sh verify_signatures
+        env:
+          SECURITY_SCAN_LEVEL: ${{ env.SECURITY_SCAN_LEVEL }}
+
+      - name: Create GitHub release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+      - name: Upload release assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./bin/blackpoint-cli
+          asset_name: blackpoint-cli
+          asset_content_type: application/octet-stream
+
+      - name: Generate release notes
+        run: |
+          chmod +x ./scripts/build.sh
+          ./scripts/build.sh generate_release_notes
+
+      - name: Update compliance documentation
+        run: |
+          chmod +x ./scripts/build.sh
+          ./scripts/build.sh update_compliance_docs
+
+      - name: Export release metrics
+        run: |
+          chmod +x ./scripts/build.sh
+          ./scripts/build.sh export_release_metrics
+        env:
+          PROMETHEUS_ENDPOINT: ${{ env.PROMETHEUS_ENDPOINT }}
