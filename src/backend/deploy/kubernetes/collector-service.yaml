@@ -1,0 +1,67 @@
+# Kubernetes Service configuration for BlackPoint Security Integration Framework collector component
+# Version: v1.25+
+# Purpose: Exposes the collector service for event ingestion and validation in the Bronze tier
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: blackpoint-collector
+  namespace: blackpoint-system
+  labels:
+    app: blackpoint-collector
+    component: data-collection
+    tier: bronze
+    version: 1.0.0
+    part-of: blackpoint-security
+    managed-by: kubernetes
+    environment: production
+  annotations:
+    # Prometheus monitoring configuration
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+    # BlackPoint specific annotations
+    security.blackpoint.io/tier: "bronze"
+    monitoring.blackpoint.io/sla-tier: "critical"
+    service.blackpoint.io/owner: "platform-team"
+
+spec:
+  # Internal-only service type for security
+  type: ClusterIP
+  
+  # Service ports configuration
+  ports:
+    # Main API endpoint
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    # Prometheus metrics endpoint
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+    # Health check endpoint
+    - name: health
+      port: 8081
+      targetPort: 8081
+      protocol: TCP
+  
+  # Pod selector matching collector deployment
+  selector:
+    app: blackpoint-collector
+    component: data-collection
+    tier: bronze
+  
+  # Session handling configuration
+  sessionAffinity: None
+  publishNotReadyAddresses: false
+  
+  # Traffic policy configuration
+  internalTrafficPolicy: Cluster
+  
+  # IP family configuration for dual-stack support
+  ipFamilyPolicy: RequireDualStack
+  ipFamilies:
+    - IPv4
+    - IPv6
