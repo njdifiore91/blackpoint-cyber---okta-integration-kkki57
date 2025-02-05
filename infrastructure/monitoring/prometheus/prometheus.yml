@@ -1,0 +1,149 @@
+# BlackPoint Security Integration Framework - Prometheus Configuration
+# Version: v2.45.0
+# Description: Main configuration file for Prometheus monitoring system
+
+global:
+  scrape_interval: 15s     # SLA tracking requires high-resolution metrics
+  evaluation_interval: 15s # Match alert evaluation with collection
+  scrape_timeout: 10s     # Prevent long-running scrapes
+  external_labels:
+    environment: production
+    region: us-east-1
+
+# Import alert and recording rules
+rule_files:
+  - "rules/recording.yml"  # Performance and resource utilization rules
+  - "rules/alerts.yml"     # SLA and system health alerts
+
+scrape_configs:
+  # Core System Components
+  - job_name: 'blackpoint-core'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: ['blackpoint-system']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        regex: 'blackpoint-.*'
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_label_component]
+        target_label: component
+      - source_labels: [__meta_kubernetes_pod_label_tier]
+        target_label: tier
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'blackpoint_.*'
+        action: keep
+
+  # Bronze Tier Collectors
+  - job_name: 'blackpoint-collectors'
+    scrape_interval: 10s  # Higher resolution for SLA <1s
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: ['blackpoint-bronze']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_component]
+        regex: 'collector'
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_label_integration]
+        target_label: integration_type
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'blackpoint_events_processed_total|blackpoint_processing_duration_.*'
+        action: keep
+
+  # Silver Tier Processors
+  - job_name: 'blackpoint-processors'
+    scrape_interval: 15s  # Standard for SLA <5s
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: ['blackpoint-silver']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_component]
+        regex: 'processor'
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_label_integration]
+        target_label: integration_type
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'blackpoint_events_processed_total|blackpoint_processing_duration_.*'
+        action: keep
+
+  # Gold Tier Analytics
+  - job_name: 'blackpoint-analytics'
+    scrape_interval: 30s  # Relaxed for SLA <30s
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: ['blackpoint-gold']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_component]
+        regex: 'analyzer'
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_label_integration]
+        target_label: integration_type
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'blackpoint_events_processed_total|blackpoint_processing_duration_.*'
+        action: keep
+
+  # API Gateway Metrics
+  - job_name: 'blackpoint-gateway'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: ['blackpoint-gateway']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_app]
+        regex: 'kong'
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_label_component]
+        target_label: component
+
+  # Node Metrics
+  - job_name: 'kubernetes-nodes'
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_node_label_kubernetes_io_role]
+        target_label: kubernetes_role
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'container_.*|node_.*'
+        action: keep
+
+  # Integration Health Metrics
+  - job_name: 'blackpoint-integrations'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names: ['blackpoint-integrations']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_integration_type]
+        target_label: integration_type
+      - source_labels: [__meta_kubernetes_pod_label_client_id]
+        target_label: client_id
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'blackpoint_integration_.*'
+        action: keep
+
+  # Service Discovery Health
+  - job_name: 'kubernetes-service-endpoints'
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names: ['blackpoint-system', 'blackpoint-bronze', 'blackpoint-silver', 'blackpoint-gold']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+        regex: 'true'
+        action: keep
+      - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_path]
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: kubernetes_namespace
+      - source_labels: [__meta_kubernetes_service_name]
+        target_label: kubernetes_service_name
