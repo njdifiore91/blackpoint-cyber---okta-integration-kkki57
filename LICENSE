@@ -1,0 +1,112 @@
+BlackPoint Security Integration Framework
+Commercial License Agreement
+Copyright (c) 2024 BlackPoint Security. All Rights Reserved.
+
+1. DEFINITIONS
+
+"Framework" refers to the BlackPoint Security Integration Framework software and associated documentation.
+"Licensor" refers to BlackPoint Security.
+"Licensee" refers to the entity that has purchased a valid license to use the Framework.
+"Integration" refers to software developed using the Framework to connect third-party security platforms.
+
+2. GRANT OF LICENSE
+
+Subject to the terms of this Agreement and valid license key verification, Licensor grants Licensee a non-exclusive, non-transferable license to:
+
+a) Use the Framework for developing security platform integrations
+b) Deploy the Framework within Licensee's environment
+c) Create and use custom integrations for Licensee's internal purposes
+
+3. USAGE RESTRICTIONS
+
+Licensee shall not:
+a) Modify, adapt or alter the Framework's core functionality
+b) Redistribute, sublicense or transfer the Framework to any third party
+c) Remove or alter any copyright notices or license terms
+d) Use the Framework beyond licensed quotas and restrictions
+e) Attempt to bypass license validation or usage monitoring
+f) File patent applications based on the Framework
+
+4. INTEGRATION DEVELOPMENT
+
+Licensee may:
+a) Develop custom integrations within licensed quotas
+b) Use development and testing environments with proper licensing
+c) Deploy integrations within Licensee's organization
+
+Integration development must:
+a) Maintain all security controls and requirements
+b) Comply with documentation and usage guidelines
+c) Pass automated compliance verification
+
+5. USAGE REQUIREMENTS
+
+Licensee must:
+a) Maintain valid license keys and API access credentials
+b) Allow usage metric collection and monitoring
+c) Implement required security controls
+d) Comply with rate limits and quotas
+e) Maintain audit logs and compliance records
+f) Use only approved deployment environments
+
+6. CONFIDENTIALITY
+
+Licensee shall:
+a) Protect Framework source code and documentation
+b) Maintain security of license keys and credentials
+c) Restrict access to authorized personnel only
+d) Report any security or compliance incidents
+
+7. WARRANTY AND SUPPORT
+
+Licensor warrants:
+a) Framework functionality as documented
+b) Support per service level agreement
+c) Security updates and patches
+d) Compliance with specified standards
+
+Warranty excludes:
+a) Custom integration issues
+b) Unauthorized modifications
+c) Security control violations
+d) Usage outside licensed terms
+
+8. LIABILITY
+
+a) Liability limited to license fees paid
+b) No liability for consequential damages
+c) Exclusions for willful misconduct
+d) Licensee indemnifies for misuse
+
+9. TERM AND TERMINATION
+
+License terminates upon:
+a) Expiration of license term
+b) Violation of Agreement terms
+c) Failure to maintain compliance
+d) Security control violations
+
+10. COMPLIANCE
+
+Licensee must:
+a) Validate license on startup and periodically
+b) Allow automated compliance checks
+c) Maintain usage within licensed limits
+d) Report compliance status as required
+
+11. EXPORT COMPLIANCE
+
+Usage must comply with:
+a) Export control regulations
+b) Regional restrictions
+c) International trade laws
+
+12. GOVERNING LAW
+
+This Agreement is governed by the laws of the jurisdiction where Licensor is headquartered, without regard to conflicts of law principles.
+
+For licensing inquiries contact:
+BlackPoint Security
+licensing@blackpoint-security.com
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
