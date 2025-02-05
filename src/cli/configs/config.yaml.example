@@ -1,0 +1,69 @@
+# BlackPoint Security Integration Framework - CLI Configuration Example
+# Version: 1.0.0
+#
+# SECURITY NOTICE:
+# - This file should have 0600 permissions (read/write for owner only)
+# - Never commit sensitive values like API keys to version control
+# - Store this file in a secure location, default: ~/.blackpoint/config.yaml
+# - All endpoints must use HTTPS with valid certificates
+
+# API communication settings
+api:
+  # API endpoint URL (required, must use HTTPS)
+  endpoint: "https://api.blackpoint.security"
+  
+  # Request timeout (1s-300s)
+  timeout: "30s"
+  
+  # Retry configuration for failed requests
+  retryAttempts: 3  # Number of retry attempts (0-10)
+  retryDelay: "5s"  # Delay between retries (1s-60s)
+  
+  # API version to use
+  version: "v1"  # Available versions: v1, v2
+
+# Authentication settings
+auth:
+  # API key for authentication (SENSITIVE)
+  # Generate from BlackPoint Security Console
+  # Minimum length: 32 characters
+  apiKey: ""  # DO NOT commit this value
+  
+  # Path to credentials file
+  # Must have 0600 permissions
+  credentialsPath: "~/.blackpoint/credentials"
+  
+  # Token expiry duration (1m-24h)
+  tokenExpiry: "1h"
+
+# Logging configuration
+logging:
+  # Log level (debug, info, warn, error)
+  level: "info"
+  
+  # Log format (text, json)
+  format: "text"
+  
+  # Log output destination
+  # Use 'stderr' for terminal output
+  # Or specify a file path: /var/log/blackpoint.log
+  output: "stderr"
+
+# Output formatting
+output:
+  # Output format for command results
+  # Supported formats: table, json, yaml
+  format: "table"
+  
+  # Enable colored output in terminal
+  color: true
+  
+  # Suppress non-essential output
+  quiet: false
+
+# Integration Testing Configuration:
+# 1. Copy this file to ~/.blackpoint/config.yaml
+# 2. Set secure file permissions: chmod 0600 ~/.blackpoint/config.yaml
+# 3. Update the api.endpoint for your environment
+# 4. Add your API key from the BlackPoint Security Console
+# 5. Test configuration: blackpoint-cli config validate
