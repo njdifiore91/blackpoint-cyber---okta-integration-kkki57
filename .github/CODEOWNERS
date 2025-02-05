@@ -1,0 +1,23 @@
+* @blackpoint/core-team
+
+# Backend package ownership
+/src/backend/pkg/* @blackpoint/backend-team
+
+# Security components ownership
+/src/backend/internal/analyzer/* @blackpoint/security-team @blackpoint/backend-team
+/src/backend/internal/encryption/* @blackpoint/security-team
+/src/backend/internal/auth/* @blackpoint/security-team
+
+# Integration framework ownership
+/src/backend/internal/integration/* @blackpoint/integration-team
+
+# CLI tool ownership
+/src/cli/* @blackpoint/cli-team
+
+# Test framework ownership
+/src/test/* @blackpoint/qa-team
+
+# Infrastructure and deployment ownership
+/infrastructure/* @blackpoint/devops-team
+.github/workflows/* @blackpoint/devops-team
+/src/backend/deploy/kubernetes/* @blackpoint/devops-team
