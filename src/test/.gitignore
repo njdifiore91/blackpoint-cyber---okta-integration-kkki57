@@ -1,0 +1,89 @@
+# Test Binaries and Build Artifacts
+*.test
+**/*.test
+*.out
+**/*.out
+bin/
+build/
+dist/
+
+# Test Results and Coverage
+test-results/
+coverage.txt
+coverage.html
+coverage.json
+junit.xml
+reports/
+**/*.coverage
+
+# Performance Test Data
+performance-results/
+benchmark-data/
+load-test-results/
+*.prof
+cpu.pprof
+mem.pprof
+trace.out
+benchmark.txt
+**/*.benchmark
+
+# Security Test Data
+security-results/
+penetration-test-data/
+rbac-test-results/
+auth-test-data/
+mock-credentials/
+**/*.key
+**/*.pem
+**/*.crt
+**/*.secret
+
+# Integration Test Data
+integration-results/
+mock-events/
+test-fixtures/
+temp-data/
+**/*.mock.json
+**/*.fixture.yaml
+**/*.integration.log
+
+# E2E Test Data
+e2e-results/
+system-test-data/
+scenario-results/
+**/*.scenario.json
+**/*.e2e.log
+**/*.e2e.report
+
+# Test Configuration
+test.env
+test.config
+mock.yaml
+test-secrets.yaml
+**/*.test.yaml
+**/*.test.json
+**/*.test.env
+
+# Temporary Test Files
+tmp/
+temp/
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+.DS_Store
+**/*.tmp
+
+# Go Test Cache
+.testcache/
+*.test
+*.out
+coverage.txt
+_test/
+**/*.generated.go
+
+# Test Dependencies
+vendor/
+go.sum
+**/*.test.sum
