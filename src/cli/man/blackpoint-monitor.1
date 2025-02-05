@@ -1,0 +1,177 @@
+.TH BLACKPOINT-MONITOR 1 "January 2024" "BlackPoint Security" "BlackPoint CLI Manual"
+.SH NAME
+blackpoint monitor \- Monitor system status, health, performance metrics, and alerts for the BlackPoint Security Integration Framework
+.SH SYNOPSIS
+.B blackpoint monitor status
+[\fB\-\-component\fR=\fIname\fR]
+[\fB\-\-format\fR=\fIformat\fR]
+[\fB\-\-refresh\fR=\fIseconds\fR]
+.PP
+.B blackpoint monitor metrics
+[\fB\-\-timerange\fR=\fIduration\fR]
+[\fB\-\-component\fR=\fIname\fR]
+[\fB\-\-format\fR=\fIformat\fR]
+.PP
+.B blackpoint monitor alerts
+[\fB\-\-severity\fR=\fIlevel\fR]
+[\fB\-\-component\fR=\fIname\fR]
+[\fB\-\-format\fR=\fIformat\fR]
+.PP
+.B blackpoint monitor health
+[\fB\-\-check\fR=\fIcomponent\fR]
+[\fB\-\-timeout\fR=\fIseconds\fR]
+[\fB\-\-format\fR=\fIformat\fR]
+.SH DESCRIPTION
+The \fBmonitor\fR command provides comprehensive real-time monitoring capabilities for the BlackPoint Security Integration Framework. It enables tracking of system health, performance metrics, and active alerts across all system components including collectors, processors, and analyzers.
+.PP
+The command supports various output formats and filtering options for efficient system monitoring and troubleshooting. All metrics and status information is collected in real-time with minimal system overhead.
+.SH COMMANDS
+.TP
+.B status
+Display current system status including component health (CPU, memory, disk usage) and operational state. Shows real-time health indicators for all monitored components.
+.TP
+.B metrics
+Show detailed performance metrics including events/second, processing latency across tiers (bronze/silver/gold), and resource utilization statistics.
+.TP
+.B alerts
+List and manage active system alerts with severity levels, timestamps, and detailed messages. Supports filtering by severity and component.
+.TP
+.B health
+Perform comprehensive health checks on system components with detailed diagnostics and recommendations for identified issues.
+.SH OPTIONS
+.TP
+.BI "\-\-component=" name
+Filter display to specific component (collector, processor, analyzer). When not specified, shows information for all components.
+.TP
+.BI "\-\-format=" format
+Output format (table, json, yaml). Default: table
+.TP
+.BI "\-\-timerange=" duration
+Time range for metrics (30s, 5m, 1h, 24h). Default: 5m
+.TP
+.BI "\-\-severity=" level
+Filter alerts by severity (critical, warning, info). Default: all
+.TP
+.BI "\-\-check=" component
+Specify component for health check. Default: all
+.TP
+.BI "\-\-refresh=" seconds
+Auto-refresh interval in seconds. Default: 0 (disabled)
+.TP
+.BI "\-\-timeout=" seconds
+Health check timeout in seconds. Default: 30
+.SH OUTPUT
+.SS System Status Output
+.PP
+Displays the following fields for each component:
+.IP \[bu] 2
+Component name
+.IP \[bu]
+Health status (healthy, degraded, unhealthy)
+.IP \[bu]
+Load percentage (0-100%)
+.IP \[bu]
+Memory usage (0-100%)
+.IP \[bu]
+Disk usage (0-100%)
+.IP \[bu]
+Last update time
+.SS Performance Metrics Output
+.PP
+Shows the following metrics:
+.IP \[bu] 2
+Events processed per second
+.IP \[bu]
+Processing latency per tier (bronze/silver/gold)
+.IP \[bu]
+Resource utilization (CPU, memory, disk)
+.IP \[bu]
+Queue depths and processing backlogs
+.SS Alert Output
+.PP
+Includes the following information:
+.IP \[bu] 2
+Alert ID
+.IP \[bu]
+Severity level
+.IP \[bu]
+Affected component
+.IP \[bu]
+Alert message
+.IP \[bu]
+Timestamp
+.IP \[bu]
+Acknowledgment status
+.SS Health Check Output
+.PP
+Provides detailed health information:
+.IP \[bu] 2
+Component name
+.IP \[bu]
+Check status
+.IP \[bu]
+Response latency
+.IP \[bu]
+Error details (if any)
+.IP \[bu]
+Remediation recommendations
+.SH EXAMPLES
+.TP
+Display current system status:
+.B blackpoint monitor status
+.TP
+Monitor collector status with auto-refresh:
+.B blackpoint monitor status --component=collector --format=json --refresh=5
+.TP
+View processor metrics for the last hour:
+.B blackpoint monitor metrics --timerange=1h --component=processor
+.TP
+List critical alerts in YAML format:
+.B blackpoint monitor alerts --severity=critical --format=yaml
+.TP
+Run health check on analyzer with extended timeout:
+.B blackpoint monitor health --check=analyzer --timeout=60
+.TP
+Filter status output for errors:
+.B blackpoint monitor status | grep -i error
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+General error
+.TP
+.B 2
+Configuration error
+.TP
+.B 3
+API communication error
+.SH ENVIRONMENT
+.TP
+.B BLACKPOINT_CONFIG
+Override default configuration file location
+.TP
+.B BLACKPOINT_FORMAT
+Default output format
+.TP
+.B BLACKPOINT_TIMEOUT
+Default command timeout
+.SH FILES
+.TP
+.I ~/.blackpoint/config.yaml
+Default configuration file location
+.TP
+.I /var/log/blackpoint/monitor.log
+Monitor command log file
+.SH SEE ALSO
+.BR blackpoint-config (1),
+.BR blackpoint-integration (1),
+.BR blackpoint-auth (1),
+.BR blackpoint-alerts (1)
+.SH BUGS
+Report bugs to: support@blackpoint.com
+.SH AUTHOR
+BlackPoint Security <support@blackpoint.com>
+.SH COPYRIGHT
+Copyright \(co 2024 BlackPoint Security. All rights reserved.
