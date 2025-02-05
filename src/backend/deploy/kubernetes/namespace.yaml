@@ -1,0 +1,108 @@
+---
+# BlackPoint Security Integration Framework - System Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: blackpoint-system
+  labels:
+    environment: production
+    app: blackpoint-security
+    managed-by: terraform
+    version: v1
+  annotations:
+    kubernetes.io/description: "Primary namespace for BlackPoint Security Integration Framework components"
+    scheduler.alpha.kubernetes.io/node-selector: "env=production"
+    net.beta.kubernetes.io/network-policy: "enabled"
+---
+# Resource Quota for System Namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: blackpoint-system-quota
+  namespace: blackpoint-system
+spec:
+  hard:
+    requests.cpu: "16"
+    requests.memory: "32Gi"
+    limits.cpu: "32"
+    limits.memory: "64Gi"
+    pods: "100"
+    services: "50"
+    secrets: "100"
+    configmaps: "100"
+---
+# BlackPoint Security Integration Framework - Monitoring Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: blackpoint-monitoring
+  labels:
+    environment: production
+    app: blackpoint-monitoring
+    managed-by: terraform
+    version: v1
+  annotations:
+    kubernetes.io/description: "Namespace for BlackPoint Security monitoring and observability components"
+    scheduler.alpha.kubernetes.io/node-selector: "env=production"
+    net.beta.kubernetes.io/network-policy: "enabled"
+---
+# Resource Quota for Monitoring Namespace
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: blackpoint-monitoring-quota
+  namespace: blackpoint-monitoring
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: "16Gi"
+    limits.cpu: "16"
+    limits.memory: "32Gi"
+    pods: "50"
+    services: "25"
+    secrets: "50"
+    configmaps: "50"
+---
+# LimitRange for System Namespace
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: blackpoint-system-limits
+  namespace: blackpoint-system
+spec:
+  limits:
+  - type: Container
+    default:
+      cpu: "500m"
+      memory: "512Mi"
+    defaultRequest:
+      cpu: "250m"
+      memory: "256Mi"
+    max:
+      cpu: "4"
+      memory: "8Gi"
+    min:
+      cpu: "100m"
+      memory: "128Mi"
+---
+# LimitRange for Monitoring Namespace
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: blackpoint-monitoring-limits
+  namespace: blackpoint-monitoring
+spec:
+  limits:
+  - type: Container
+    default:
+      cpu: "250m"
+      memory: "256Mi"
+    defaultRequest:
+      cpu: "100m"
+      memory: "128Mi"
+    max:
+      cpu: "2"
+      memory: "4Gi"
+    min:
+      cpu: "50m"
+      memory: "64Mi"
