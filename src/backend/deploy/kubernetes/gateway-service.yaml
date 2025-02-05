@@ -1,0 +1,68 @@
+# Kong API Gateway Service Configuration
+# Version: v1
+# Kubernetes Version: v1.25+
+# Purpose: Exposes Kong API Gateway with NLB, TLS termination, and monitoring integration
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: blackpoint-gateway
+  namespace: blackpoint-system
+  labels:
+    app: blackpoint-gateway
+    component: api-gateway
+    part-of: blackpoint-security
+    tier: frontend
+    managed-by: kubernetes
+    version: v1
+    environment: production
+  annotations:
+    # AWS NLB Configuration
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-connection-idle-timeout: "60"
+    
+    # Health Check Configuration
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: HTTP
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: /health
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8000"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "10"
+    
+    # SSL/TLS Configuration
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:region:account:certificate/certificate-id
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+    
+    # Prometheus Monitoring Integration
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8100"
+    prometheus.io/path: /metrics
+    
+    # Documentation
+    kubernetes.io/description: LoadBalancer Service exposing Kong API Gateway for BlackPoint Security Integration Framework
+    kubernetes.io/change-cause: Enhanced Kong API Gateway Service with improved security and monitoring capabilities
+
+spec:
+  type: LoadBalancer
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+      protocol: TCP
+    - name: https
+      port: 443
+      targetPort: 8443
+      protocol: TCP
+    - name: metrics
+      port: 8100
+      targetPort: 8100
+      protocol: TCP
+    - name: admin
+      port: 8001
+      targetPort: 8001
+      protocol: TCP
+  selector:
+    app: blackpoint-gateway
+  sessionAffinity: None
+  externalTrafficPolicy: Local
+  healthCheckNodePort: 32000
