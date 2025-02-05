@@ -1,0 +1,90 @@
+.git/
+.gitignore
+.gitattributes
+
+# Security Sensitive - Prevent credential leaks
+.env
+.env.*
+*.key
+*.pem
+credentials/
+secrets/
+
+# Development Artifacts
+*.swp
+*.swo
+*.swn
+*.bak
+.idea/
+.vscode/
+*.iml
+
+# Go Specific
+vendor/
+*_test.go
+coverage.out
+coverage.html
+go.work
+
+# Build Artifacts
+bin/
+dist/
+tmp/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Documentation
+docs/
+*.md
+man/
+README*
+CHANGELOG*
+LICENSE*
+
+# Configuration - Allow only essential configs
+*.yaml
+*.yml
+*.toml
+*.json
+!app.yaml
+
+# Tools and Scripts
+scripts/
+tools/
+Makefile
+*.sh
+
+# Docker - Exclude Docker files from context
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Kubernetes
+deploy/
+k8s/
+manifests/
+
+# Data and Logs
+*.log
+logs/
+data/
+*.db
+
+# Testing
+test/
+tests/
+mocks/
+*.test
+
+# CI/CD
+.github/
+.gitlab/
+.circleci/
+*.jenkinsfile
+
+# Temporary Files
+*~
+*.tmp
+*.temp
