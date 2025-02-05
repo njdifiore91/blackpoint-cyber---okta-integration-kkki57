@@ -1,0 +1,116 @@
+# BlackPoint Security Integration Framework
+# Collector Configuration v1.0.0
+# This configuration file defines settings for security event collection with optimized performance and security controls
+
+server:
+  # Enhanced HTTP server configuration for secure event collection
+  port: 8080
+  host: "0.0.0.0"
+  read_timeout: "5s"
+  write_timeout: "10s"
+  max_connections: 5000
+  idle_timeout: "30s"
+  tls:
+    enabled: true
+    cert_path: "/etc/blackpoint/certs/collector.crt"
+    key_path: "/etc/blackpoint/certs/collector.key"
+    min_version: "1.3"
+
+collection:
+  # Optimized event collection settings for high throughput
+  buffer_size: 10000  # Maximum number of events in memory buffer
+  batch_size: 1000    # Number of events per batch
+  flush_interval: "1s" # Maximum time to wait before flushing batch
+  collection_timeout: "5s"  # Maximum time to wait for event collection
+  max_batch_age: "2s"      # Maximum age of events in a batch
+  retry_backoff: "100ms"   # Initial retry backoff duration
+  max_retries: 3          # Maximum number of retry attempts
+  circuit_breaker:
+    threshold: 0.5        # Error threshold to trip circuit breaker
+    reset_timeout: "30s"  # Time before circuit breaker resets
+
+validation:
+  # Enhanced event validation configuration with security controls
+  max_event_size: 1048576  # 1MB maximum event size
+  cache_duration: "1h"     # Validation cache duration
+  strict_mode: true       # Enforce strict validation rules
+  security_patterns:      # Security validation patterns
+    - "payload_sanitized"
+    - "no_sensitive_data"
+    - "schema_compliant"
+  validation_timeout: "500ms"  # Maximum validation time per event
+  schema_cache_size: 1000     # Number of cached schema validations
+
+streaming:
+  # Optimized Kafka streaming configuration for high throughput
+  bootstrap_servers:
+    - "kafka-1.blackpoint:9092"
+    - "kafka-2.blackpoint:9092"
+    - "kafka-3.blackpoint:9092"
+  topic: "bronze_events"
+  producer_config:
+    compression_type: "snappy"
+    batch_size: 1000
+    linger_ms: 100
+    retries: 3
+    acks: "all"
+    max_in_flight: 5
+    idempotence: true
+    delivery_timeout_ms: 30000
+
+metrics:
+  # Enhanced collector metrics configuration with detailed monitoring
+  enabled: true
+  prometheus_port: 9090
+  collection_interval: "15s"
+  detailed_metrics: true
+  histogram_buckets:
+    - 0.001  # 1ms
+    - 0.005  # 5ms
+    - 0.01   # 10ms
+    - 0.025  # 25ms
+    - 0.05   # 50ms
+    - 0.1    # 100ms
+    - 0.25   # 250ms
+    - 0.5    # 500ms
+    - 1.0    # 1s
+  label_cardinality_limit: 1000
+
+logging:
+  # Comprehensive logging configuration with security auditing
+  level: "info"
+  format: "json"
+  output: "stdout"
+  audit_log_enabled: true
+  mask_sensitive_data: true
+  retention_days: 30
+  fields:
+    environment: "production"
+    component: "collector"
+    version: "1.0.0"
+  security_audit:
+    enabled: true
+    log_path: "/var/log/blackpoint/security_audit.log"
+    fields:
+      - "client_id"
+      - "event_id"
+      - "source_platform"
+      - "validation_status"
+
+security:
+  # Security controls and compliance settings
+  tls_enabled: true
+  min_tls_version: "1.3"
+  client_auth_required: true
+  allowed_cipher_suites:
+    - "TLS_AES_128_GCM_SHA256"
+    - "TLS_AES_256_GCM_SHA384"
+  certificate_paths:
+    cert: "/etc/blackpoint/certs/collector.crt"
+    key: "/etc/blackpoint/certs/collector.key"
+    ca: "/etc/blackpoint/certs/ca.crt"
+  authentication:
+    enabled: true
+    type: "oauth2"
+    token_validation_endpoint: "https://auth.blackpoint.io/validate"
+    cache_duration: "5m"
