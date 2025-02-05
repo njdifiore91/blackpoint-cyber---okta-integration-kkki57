@@ -1,0 +1,218 @@
+name: Integration Tests & Deployment
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# Permissions required for OIDC token authentication
+permissions:
+  contents: read
+  packages: write
+  deployments: write
+  id-token: write
+  security-events: write
+  actions: read
+
+# Ensure only one workflow runs at a time per ref
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: '1.21'
+  DOCKER_REGISTRY: ${{ secrets.DOCKER_REGISTRY }}
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  MIN_TEST_COVERAGE: '80'
+  MAX_TEST_DURATION: '30m'
+  SECURITY_SCAN_LEVEL: 'HIGH'
+
+jobs:
+  security_scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Run dependency review
+        uses: actions/dependency-review-action@v3
+        with:
+          fail-on-severity: ${{ env.SECURITY_SCAN_LEVEL }}
+          
+      - name: Scan for secrets
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          config-path: .gitleaks.toml
+          verbose: true
+          
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@v1
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload security scan results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+  integration_tests:
+    name: Integration Tests
+    needs: security_scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+          
+      - name: Install dependencies
+        run: |
+          go mod download
+          go mod verify
+
+      - name: Run unit tests with coverage
+        run: |
+          go test -v -race -coverprofile=coverage.txt -covermode=atomic ./...
+          go tool cover -func=coverage.txt
+
+      - name: Verify test coverage
+        run: |
+          COVERAGE=$(go tool cover -func=coverage.txt | grep total | awk '{print $3}' | sed 's/%//')
+          if (( $(echo "$COVERAGE < ${{ env.MIN_TEST_COVERAGE }}" | bc -l) )); then
+            echo "Test coverage ${COVERAGE}% is below minimum ${MIN_TEST_COVERAGE}%"
+            exit 1
+          fi
+
+      - name: Run integration tests
+        timeout-minutes: 20
+        env:
+          TEST_CONFIG: ${{ secrets.TEST_CONFIG }}
+        run: |
+          go test -v -tags=integration ./... -timeout ${{ env.MAX_TEST_DURATION }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: |
+            coverage.txt
+            test-results/
+
+  e2e_tests:
+    name: End-to-End Tests
+    needs: integration_tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment: integration
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          
+      - name: Setup test environment
+        run: |
+          aws eks update-kubeconfig --name integration-cluster
+          kubectl create namespace integration-tests --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Run E2E test suite
+        env:
+          KUBECONFIG: ${{ secrets.KUBECONFIG }}
+        run: |
+          go test -v -tags=e2e ./... -timeout ${{ env.MAX_TEST_DURATION }}
+
+      - name: Export performance metrics
+        run: |
+          kubectl logs -n integration-tests -l app=performance-tests > performance.log
+
+      - name: Cleanup test resources
+        if: always()
+        run: |
+          kubectl delete namespace integration-tests --ignore-not-found
+
+  build_deploy:
+    name: Build and Deploy
+    needs: e2e_tests
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: production
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Docker Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push Docker images
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.DOCKER_REGISTRY }}/blackpoint/integration:${{ github.sha }}
+            ${{ env.DOCKER_REGISTRY }}/blackpoint/integration:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan container images
+        uses: aquasecurity/trivy-action@v1
+        with:
+          image-ref: '${{ env.DOCKER_REGISTRY }}/blackpoint/integration:${{ github.sha }}'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Deploy to Kubernetes
+        run: |
+          aws eks update-kubeconfig --name production-cluster
+          helm upgrade --install blackpoint-integration ./charts/integration \
+            --namespace production \
+            --set image.tag=${{ github.sha }} \
+            --set image.repository=${{ env.DOCKER_REGISTRY }}/blackpoint/integration \
+            --wait --timeout 10m
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/blackpoint-integration -n production
+          kubectl get pods -n production -l app=blackpoint-integration
+
+      - name: Export deployment metrics
+        run: |
+          kubectl logs -n production -l app=blackpoint-integration --tail=100 > deployment.log
+
+      - name: Upload deployment artifacts
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: deployment-artifacts
+          path: |
+            deployment.log
+            trivy-results.sarif
