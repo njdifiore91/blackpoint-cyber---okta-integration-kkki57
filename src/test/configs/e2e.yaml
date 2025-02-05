@@ -1,0 +1,149 @@
+# End-to-end test configuration for BlackPoint Security Integration Framework
+# Version: 1.0.0
+
+# Test timeouts for different test phases and scenarios
+test_timeouts:
+  default: ${DefaultTestTimeout} # From constants package
+  setup: 2m
+  teardown: 2m
+  data_flow: 10m
+  integration: 2w # Validates 2-week integration development target
+  performance: 30m
+  accuracy: 1h
+
+# Latency thresholds for each processing tier
+latency_thresholds:
+  bronze: ${BronzeLatencyThreshold} # <1s from constants
+  silver: ${SilverLatencyThreshold} # <5s from constants
+  gold: ${GoldLatencyThreshold} # <30s from constants
+  # Additional percentile thresholds for SLA validation
+  percentile_99: 1.5x # 50% buffer for 99th percentile
+  percentile_95: 1.2x # 20% buffer for 95th percentile
+
+# Performance and scalability requirements
+performance_requirements:
+  min_throughput: ${MinimumThroughputEvents} # >1000 events/second per client
+  min_accuracy: ${MinimumAccuracyThreshold} # ≥80% compared to manual integration
+  max_concurrent_clients: ${MaxConcurrentClients} # Support 100+ concurrent clients
+  # Test execution phases
+  ramp_up_period: 5m
+  steady_state_duration: 15m
+  cool_down_period: 5m
+
+# Test data configuration
+test_data_config:
+  sample_size: 10000 # Number of test events per scenario
+  data_distribution: random # Random distribution for realistic testing
+  # Event types to validate
+  event_types:
+    - security_alert
+    - user_activity
+    - system_log
+  validation_frequency: 1m # Frequency of accuracy validation checks
+
+# Data flow validation scenarios
+data_flow_scenarios:
+  - name: bronze_tier_validation
+    description: Validate raw data collection and storage
+    tier: bronze
+    duration: 5m
+    validation_points:
+      - event_collection
+      - data_preservation
+      - initial_validation
+
+  - name: silver_tier_validation
+    description: Validate data normalization and processing
+    tier: silver
+    duration: 10m
+    validation_points:
+      - normalization
+      - aggregation
+      - field_transformation
+
+  - name: gold_tier_validation
+    description: Validate security intelligence generation
+    tier: gold
+    duration: 15m
+    validation_points:
+      - threat_detection
+      - alert_generation
+      - security_analysis
+
+# Performance test scenarios
+performance_scenarios:
+  - name: single_client_baseline
+    description: Baseline performance with single client
+    client_count: 1
+    duration: 10m
+    metrics:
+      - throughput
+      - latency
+      - error_rate
+
+  - name: concurrent_clients_scalability
+    description: Scalability testing with multiple clients
+    client_count: ${MaxConcurrentClients}
+    duration: 30m
+    metrics:
+      - throughput_per_client
+      - system_resources
+      - error_rate
+
+# Accuracy validation scenarios
+accuracy_scenarios:
+  - name: automated_validation
+    description: Automated accuracy validation against baseline
+    sample_size: 10000
+    validation_method: automated
+    metrics:
+      - field_accuracy
+      - event_correlation
+      - alert_accuracy
+
+  - name: manual_comparison
+    description: Manual validation sample for baseline comparison
+    sample_size: 1000
+    validation_method: manual
+    metrics:
+      - field_accuracy
+      - event_correlation
+      - alert_accuracy
+
+# Monitoring configuration for test execution
+monitoring_config:
+  metrics_collection:
+    interval: 10s
+    retention: 7d
+  alert_thresholds:
+    cpu_usage: 80%
+    memory_usage: 80%
+    error_rate: 5%
+  exporters:
+    - prometheus
+    - datadog
+    - elasticsearch
+
+# Test environment configuration
+environment_config:
+  kubernetes:
+    namespace: e2e-tests
+    resource_limits:
+      cpu: 4
+      memory: 8Gi
+    resource_requests:
+      cpu: 2
+      memory: 4Gi
+  dependencies:
+    confluent:
+      version: "7.0"
+      topics:
+        - bronze_events
+        - silver_events
+        - gold_events
+    chaossearch:
+      retention: 7d
+      indexes:
+        - bronze_data
+        - silver_data
+        - gold_data
