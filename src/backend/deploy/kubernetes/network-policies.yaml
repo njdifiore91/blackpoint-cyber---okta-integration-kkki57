@@ -1,0 +1,162 @@
+# Kubernetes NetworkPolicy configuration v1.25+
+# Implements zero-trust network security model with strict pod-to-pod communication rules
+
+---
+# Default deny-all policy to establish zero-trust baseline
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: blackpoint-system
+spec:
+  podSelector: {}  # Applies to all pods
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# Network policy for collector service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: collector-network-policy
+  namespace: blackpoint-system
+spec:
+  podSelector:
+    matchLabels:
+      app: collector
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: blackpoint-system
+          podSelector:
+            matchLabels:
+              app: gateway
+      ports:
+        - port: 8080
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: blackpoint-system
+          podSelector:
+            matchLabels:
+              app: normalizer
+      ports:
+        - port: 8080
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+
+---
+# Network policy for normalizer service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: normalizer-network-policy
+  namespace: blackpoint-system
+spec:
+  podSelector:
+    matchLabels:
+      app: normalizer
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: blackpoint-system
+          podSelector:
+            matchLabels:
+              app: collector
+      ports:
+        - port: 8080
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: blackpoint-system
+          podSelector:
+            matchLabels:
+              app: analyzer
+      ports:
+        - port: 8080
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+
+---
+# Network policy for analyzer service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: analyzer-network-policy
+  namespace: blackpoint-system
+spec:
+  podSelector:
+    matchLabels:
+      app: analyzer
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: blackpoint-system
+          podSelector:
+            matchLabels:
+              app: normalizer
+      ports:
+        - port: 8080
+          protocol: TCP
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: blackpoint-monitoring
+          podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: 9090
+          protocol: TCP
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
