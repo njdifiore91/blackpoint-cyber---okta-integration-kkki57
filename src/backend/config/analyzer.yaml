@@ -1,0 +1,81 @@
+# BlackPoint Security Integration Framework
+# Gold Tier Security Analyzer Configuration
+# Version: 1.0
+
+version: "1.0"
+environment: "production"
+log_level: "info"
+
+# Detection configuration for threat analysis
+detection:
+  rules:
+    timeout_seconds: 30
+    max_concurrent: 100
+    severity_threshold: 0.7
+    enabled_rules:
+      - "brute_force_detection"
+      - "privilege_escalation"
+      - "data_exfiltration"
+      - "malware_activity"
+      - "unauthorized_access"
+    validation:
+      min_confidence: 0.8
+      max_false_positives: 0.2
+
+# Event correlation settings
+correlation:
+  window_minutes: 15
+  max_events_per_window: 1000
+  enabled_rules:
+    - "temporal_correlation"
+    - "spatial_correlation"
+    - "behavioral_correlation"
+    - "pattern_correlation"
+  min_correlation_confidence: 0.8
+  batch_processing:
+    enabled: true
+    size: 100
+    timeout_seconds: 5
+
+# Metrics and monitoring configuration
+metrics:
+  enabled: true
+  collection_interval_seconds: 60
+  kubernetes:
+    enabled: true
+    namespace: "security"
+    pod_labels:
+      app: "blackpoint-analyzer"
+      tier: "gold"
+      component: "analyzer"
+  prometheus:
+    enabled: true
+    port: 9090
+    path: "/metrics"
+  telemetry:
+    enabled: true
+    batch_size: 100
+    flush_interval_seconds: 30
+
+# Performance optimization settings
+performance:
+  max_goroutines: 1000
+  buffer_size: 10000
+  batch_size: 100
+  resource_limits:
+    cpu_cores: 4.0
+    memory_mb: 8192
+    disk_gb: 100
+
+# Storage and data retention configuration
+storage:
+  type: "chaossearch"
+  retention_days: 90
+  index_pattern: "gold-alerts-*"
+  encryption:
+    enabled: true
+    key_rotation_days: 30
+  backup:
+    enabled: true
+    schedule: "0 0 * * *"
+    retention_copies: 7
