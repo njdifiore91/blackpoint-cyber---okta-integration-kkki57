@@ -1,0 +1,123 @@
+# BlackPoint Security Integration Framework
+# Platform Integration Configuration Template
+# Version: 1.0.0
+
+# WARNING: This is an example configuration file. Do not store actual credentials here.
+# For production use, credentials should be managed through secure secret management.
+
+#------------------------------------------------------------------------------
+# Integration Identification
+#------------------------------------------------------------------------------
+name: "aws-security-hub"                # Required: Unique name matching ^[a-zA-Z0-9-_]{3,64}$
+platform_type: "aws"                    # Required: Security platform identifier
+version: "1.0.0"                        # Required: Integration version
+environment: "production"               # Required: production/staging/development
+
+#------------------------------------------------------------------------------
+# Authentication Configuration
+#------------------------------------------------------------------------------
+auth:
+  # Required: Authentication method
+  type: "oauth2"                        # Supported: oauth2, api_key, basic, certificate
+  
+  # OAuth2 Configuration
+  oauth2:
+    client_id: "your-client-id"         # Required for OAuth2
+    client_secret: "your-client-secret" # Required for OAuth2
+    token_url: "https://oauth.example.com/token"
+    scopes: 
+      - "security:read"
+      - "security:write"
+    token_lifetime: "1h"                # Max: 24h
+  
+  # Alternative Authentication Methods (uncomment as needed)
+  # api_key:
+  #   key: "your-api-key"              # Min length: 32 characters
+  #   header: "X-API-Key"              # Custom header name
+  
+  # basic_auth:
+  #   username: "your-username"
+  #   password: "your-password"         # Min length: 12, Max length: 128
+  
+  # certificate:
+  #   cert_path: "/path/to/cert.pem"
+  #   key_path: "/path/to/key.pem"
+  #   ca_path: "/path/to/ca.pem"
+
+#------------------------------------------------------------------------------
+# Data Collection Configuration
+#------------------------------------------------------------------------------
+collection:
+  mode: "hybrid"                        # Required: realtime, batch, or hybrid
+  
+  # Event Types Configuration
+  event_types:                          # Required: At least one event type
+    - "SecurityAlert"
+    - "UserActivity"
+    - "SystemLog"
+    - "AuditLog"
+  
+  # Batch Collection Settings
+  batch:
+    schedule: "*/5 * * * *"            # Required for batch/hybrid: cron format
+    max_items: 1000                     # Optional: Default 1000
+    timeout: "5m"                       # Optional: Default 30s
+    retry:
+      max_attempts: 3                   # Optional: Default 3
+      delay: "5s"                       # Optional: Default 5s
+  
+  # Real-time Collection Settings
+  realtime:
+    buffer_size: 1000                   # Optional: Default 1000
+    flush_interval: "1s"                # Optional: Default 1s
+    max_event_size: "1MB"              # Optional: Default 1MB
+
+#------------------------------------------------------------------------------
+# Performance Configuration
+#------------------------------------------------------------------------------
+performance:
+  max_concurrent_requests: 100          # Optional: Default 100
+  request_timeout: "30s"                # Optional: Default 30s
+  connection_timeout: "10s"             # Optional: Default 10s
+  keep_alive_interval: "30s"            # Optional: Default 30s
+  retry:
+    max_attempts: 3                     # Optional: Default 3
+    backoff: "exponential"             # Optional: linear, exponential
+    initial_delay: "5s"                # Optional: Default 5s
+
+#------------------------------------------------------------------------------
+# Monitoring Configuration
+#------------------------------------------------------------------------------
+monitoring:
+  metrics_enabled: true                 # Optional: Default true
+  logging:
+    level: "info"                       # Optional: debug, info, warn, error
+    format: "json"                      # Optional: json, text
+  tracing:
+    enabled: true                       # Optional: Default true
+    sampling_rate: 0.1                  # Optional: 0.0-1.0
+
+#------------------------------------------------------------------------------
+# Data Retention Configuration
+#------------------------------------------------------------------------------
+retention:
+  bronze_tier: "30d"                    # Optional: Default 30d
+  silver_tier: "90d"                    # Optional: Default 90d
+  gold_tier: "365d"                     # Optional: Default 365d
+  archive:
+    enabled: true                       # Optional: Default true
+    storage_class: "COLD"              # Optional: HOT, WARM, COLD
+
+#------------------------------------------------------------------------------
+# Security Configuration
+#------------------------------------------------------------------------------
+security:
+  encryption:
+    field_level: true                   # Optional: Default true
+    sensitive_fields:                   # Optional: Fields to encrypt
+      - "credentials"
+      - "api_key"
+      - "token"
+  compliance:
+    pii_handling: "mask"                # Optional: mask, encrypt, exclude
+    audit_logging: true                 # Optional: Default true
