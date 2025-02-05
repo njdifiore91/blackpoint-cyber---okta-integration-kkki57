@@ -1,0 +1,171 @@
+name: Analyzer CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/backend/cmd/analyzer/**'
+      - 'src/backend/internal/analyzer/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/backend/cmd/analyzer/**'
+      - 'src/backend/internal/analyzer/**'
+
+env:
+  GO_VERSION: '1.21'
+  DOCKER_BUILDKIT: '1'
+  SERVICE: 'analyzer'
+  MIN_COVERAGE: '80'
+  MAX_IMAGE_SIZE: '50'
+  DEPLOYMENT_TIMEOUT: '300'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download dependencies
+        run: |
+          cd src/backend
+          go mod download
+          go mod verify
+
+      - name: Run unit tests with coverage
+        run: |
+          cd src/backend
+          go test -v -race -coverprofile=coverage.out -covermode=atomic ./cmd/analyzer/... ./internal/analyzer/...
+
+      - name: Run integration tests
+        run: |
+          cd src/backend
+          go test -v -tags=integration ./test/integration/analyzer/...
+
+      - name: Validate coverage threshold
+        run: |
+          cd src/backend
+          COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          if (( $(echo "$COVERAGE < $MIN_COVERAGE" | bc -l) )); then
+            echo "Test coverage ${COVERAGE}% below minimum ${MIN_COVERAGE}%"
+            exit 1
+          fi
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./src/backend/coverage.out
+          flags: analyzer
+          fail_ci_if_error: true
+
+      - name: Store test artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: |
+            src/backend/coverage.out
+            src/backend/test-results/
+
+  build:
+    name: Build
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to container registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ secrets.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v4
+        with:
+          context: src/backend
+          file: src/backend/Dockerfile
+          build-args: |
+            SERVICE=${{ env.SERVICE }}
+            VERSION=${{ github.sha }}
+          push: true
+          tags: |
+            ${{ secrets.REGISTRY }}/${{ env.SERVICE }}:${{ github.sha }}
+            ${{ secrets.REGISTRY }}/${{ env.SERVICE }}:latest
+          cache-from: type=registry,ref=${{ secrets.REGISTRY }}/${{ env.SERVICE }}:buildcache
+          cache-to: type=registry,ref=${{ secrets.REGISTRY }}/${{ env.SERVICE }}:buildcache,mode=max
+
+      - name: Validate image size
+        run: |
+          SIZE=$(docker image inspect ${{ secrets.REGISTRY }}/${{ env.SERVICE }}:${{ github.sha }} --format='{{.Size}}')
+          MAX_BYTES=$(($MAX_IMAGE_SIZE * 1024 * 1024))
+          if [ "$SIZE" -gt "$MAX_BYTES" ]; then
+            echo "Image size ($SIZE bytes) exceeds limit ($MAX_BYTES bytes)"
+            exit 1
+          fi
+
+      - name: Run vulnerability scan
+        uses: aquasecurity/trivy-action@v1
+        with:
+          image-ref: ${{ secrets.REGISTRY }}/${{ env.SERVICE }}:${{ github.sha }}
+          format: 'table'
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure Kubernetes
+        run: |
+          echo "${{ secrets.KUBECONFIG }}" > kubeconfig.yaml
+          export KUBECONFIG=kubeconfig.yaml
+
+      - name: Update deployment
+        run: |
+          kubectl set image deployment/analyzer \
+            analyzer=${{ secrets.REGISTRY }}/${{ env.SERVICE }}:${{ github.sha }} \
+            -n blackpoint-system
+
+      - name: Verify rollout
+        run: |
+          kubectl rollout status deployment/analyzer \
+            -n blackpoint-system \
+            --timeout=${{ env.DEPLOYMENT_TIMEOUT }}s
+
+      - name: Run health checks
+        run: |
+          for i in {1..5}; do
+            if kubectl exec deploy/analyzer -n blackpoint-system -- curl -f http://localhost:8080/health; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
+
+      - name: Enable monitoring
+        run: |
+          kubectl annotate deployment/analyzer -n blackpoint-system \
+            prometheus.io/scrape="true" \
+            prometheus.io/port="9090" \
+            prometheus.io/path="/metrics" \
+            --overwrite
