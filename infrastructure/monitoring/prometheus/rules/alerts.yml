@@ -1,0 +1,175 @@
+# BlackPoint Security Integration Framework Alert Rules
+# Version: v2.45.0
+# Evaluation Interval: 15s
+
+groups:
+  # System Performance Alerts
+  - name: SystemPerformance
+    rules:
+      # Processing Latency Alerts - Bronze Tier (SLA: <1s)
+      - alert: BronzeProcessingLatencyHigh
+        expr: blackpoint_bronze_latency_p95_5m > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          tier: bronze
+        annotations:
+          summary: "Bronze tier processing latency approaching SLA"
+          description: "P95 latency {{ $value }}s exceeds warning threshold (0.8s)"
+          runbook_url: "https://runbooks.blackpoint.com/latency/bronze"
+
+      - alert: BronzeProcessingLatencyCritical
+        expr: blackpoint_bronze_latency_p95_5m > 1.0
+        for: 5m
+        labels:
+          severity: critical
+          tier: bronze
+        annotations:
+          summary: "Bronze tier processing latency exceeding SLA"
+          description: "P95 latency {{ $value }}s exceeds SLA threshold (1.0s)"
+          runbook_url: "https://runbooks.blackpoint.com/latency/bronze"
+
+      # Processing Latency Alerts - Silver Tier (SLA: <5s)
+      - alert: SilverProcessingLatencyHigh
+        expr: blackpoint_silver_latency_p95_5m > 4.0
+        for: 5m
+        labels:
+          severity: warning
+          tier: silver
+        annotations:
+          summary: "Silver tier processing latency approaching SLA"
+          description: "P95 latency {{ $value }}s exceeds warning threshold (4.0s)"
+          runbook_url: "https://runbooks.blackpoint.com/latency/silver"
+
+      - alert: SilverProcessingLatencyCritical
+        expr: blackpoint_silver_latency_p95_5m > 5.0
+        for: 5m
+        labels:
+          severity: critical
+          tier: silver
+        annotations:
+          summary: "Silver tier processing latency exceeding SLA"
+          description: "P95 latency {{ $value }}s exceeds SLA threshold (5.0s)"
+          runbook_url: "https://runbooks.blackpoint.com/latency/silver"
+
+      # Processing Latency Alerts - Gold Tier (SLA: <30s)
+      - alert: GoldProcessingLatencyHigh
+        expr: blackpoint_gold_latency_p95_5m > 25.0
+        for: 5m
+        labels:
+          severity: warning
+          tier: gold
+        annotations:
+          summary: "Gold tier processing latency approaching SLA"
+          description: "P95 latency {{ $value }}s exceeds warning threshold (25.0s)"
+          runbook_url: "https://runbooks.blackpoint.com/latency/gold"
+
+      - alert: GoldProcessingLatencyCritical
+        expr: blackpoint_gold_latency_p95_5m > 30.0
+        for: 5m
+        labels:
+          severity: critical
+          tier: gold
+        annotations:
+          summary: "Gold tier processing latency exceeding SLA"
+          description: "P95 latency {{ $value }}s exceeds SLA threshold (30.0s)"
+          runbook_url: "https://runbooks.blackpoint.com/latency/gold"
+
+  # Resource Utilization Alerts
+  - name: ResourceUtilization
+    rules:
+      # CPU Utilization
+      - alert: HighCPUUtilization
+        expr: blackpoint_cpu_utilization_5m > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU utilization detected"
+          description: "CPU utilization at {{ $value }}% for past 10 minutes"
+          runbook_url: "https://runbooks.blackpoint.com/resources/cpu"
+
+      # Memory Utilization
+      - alert: HighMemoryUtilization
+        expr: blackpoint_memory_utilization_5m > 85
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory utilization detected"
+          description: "Memory utilization at {{ $value }}% for past 10 minutes"
+          runbook_url: "https://runbooks.blackpoint.com/resources/memory"
+
+      # Predictive Resource Alerts
+      - alert: PredictedResourceSaturation
+        expr: blackpoint_resource_saturation_prediction_6h > 90
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Resource saturation predicted within 24 hours"
+          description: "Predicted utilization {{ $value }}% in next 24 hours"
+          runbook_url: "https://runbooks.blackpoint.com/resources/prediction"
+
+  # System Availability Alerts
+  - name: SystemAvailability
+    rules:
+      # Service Health
+      - alert: ServiceDown
+        expr: up{job=~"blackpoint-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.job }} is down"
+          description: "Service has been down for more than 1 minute"
+          runbook_url: "https://runbooks.blackpoint.com/availability/service-down"
+
+      # Component Health
+      - alert: ComponentHealthDegraded
+        expr: blackpoint_component_health_score_5m < 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Component health degraded: {{ $labels.component }}"
+          description: "Health score at {{ $value }}% for past 5 minutes"
+          runbook_url: "https://runbooks.blackpoint.com/availability/health-score"
+
+  # Integration Alerts
+  - name: IntegrationHealth
+    rules:
+      # Integration Success Rate
+      - alert: IntegrationFailureRate
+        expr: blackpoint_integration_success_rate_5m < 95
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High integration failure rate for {{ $labels.integration_type }}"
+          description: "Success rate at {{ $value }}% for past 5 minutes"
+          runbook_url: "https://runbooks.blackpoint.com/integration/failure-rate"
+
+      # Data Collection
+      - alert: DataCollectionStopped
+        expr: rate(blackpoint_events_processed_total{tier="bronze"}[5m]) == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Data collection stopped for {{ $labels.integration_type }}"
+          description: "No events received in past 5 minutes"
+          runbook_url: "https://runbooks.blackpoint.com/integration/collection"
+
+  # SLA Compliance Alerts
+  - name: SLACompliance
+    rules:
+      - alert: SLAComplianceBreach
+        expr: blackpoint_sla_compliance_ratio_5m < 0.99
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "SLA compliance breach for {{ $labels.tier }} tier"
+          description: "Compliance ratio at {{ $value }} for past 15 minutes"
+          runbook_url: "https://runbooks.blackpoint.com/sla/compliance"
