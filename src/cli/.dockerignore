@@ -1,0 +1,99 @@
+.git/
+.gitignore
+.gitattributes
+.github/
+
+# Development and Testing
+test/
+tests/
+**/*_test.go
+**/*.test
+coverage.out
+Makefile
+scripts/
+*.sh
+completions/
+
+# Documentation
+docs/
+man/
+*.md
+CHANGELOG
+LICENSE
+NOTICE
+AUTHORS
+
+# Build and Dependencies
+vendor/
+dist/
+build/
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Configuration and Environment
+.env*
+*.env
+config.yaml
+*.example
+*.sample
+*.template
+
+# Security and Keys
+**/*.key
+**/*.pem
+**/*.crt
+**/*.p12
+**/*.pfx
+**/*.keystore
+**/*.truststore
+id_rsa*
+known_hosts
+
+# Temporary and Cache Files
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+*.cache
+*.bak
+
+# IDE and Editor Files
+.idea/
+.vscode/
+*.sublime-*
+*.code-workspace
+.project
+.settings/
+.classpath
+
+# Debug Files
+debug/
+*.debug
+*.pprof
+*.trace
+
+# Container and Infrastructure
+Dockerfile*
+docker-compose*.yml
+*.dockerfile
+.dockerignore
+
+# Generated Files
+*.pb.go
+*_gen.go
+swagger.json
+openapi.json
+
+# Miscellaneous
+*.tar
+*.gz
+*.zip
+*.rar
+*.7z
+core.*
