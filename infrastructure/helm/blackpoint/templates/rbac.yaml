@@ -1,0 +1,146 @@
+{{/* Kubernetes RBAC resources for BlackPoint Security Integration Framework */}}
+{{/* Version: v1.25+ */}}
+
+{{/* Collector Role */}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ template "blackpoint.fullname" . }}-collector-role
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ template "blackpoint.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: collector
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+spec:
+  rules:
+    - apiGroups: [""]
+      resources: ["configmaps", "secrets"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: [""]
+      resources: ["pods"]
+      verbs: ["get"]
+    - apiGroups: ["metrics.k8s.io"]
+      resources: ["pods"]
+      verbs: ["get", "list"]
+    {{- if .Values.rbac.extraPermissions.collector }}
+    {{- toYaml .Values.rbac.extraPermissions.collector | nindent 4 }}
+    {{- end }}
+
+{{/* Analyzer Role */}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ template "blackpoint.fullname" . }}-analyzer-role
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ template "blackpoint.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: analyzer
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+spec:
+  rules:
+    - apiGroups: [""]
+      resources: ["configmaps", "secrets"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: [""]
+      resources: ["pods", "services"]
+      verbs: ["get", "list"]
+    - apiGroups: ["metrics.k8s.io"]
+      resources: ["pods"]
+      verbs: ["get", "list"]
+    {{- if .Values.rbac.extraPermissions.analyzer }}
+    {{- toYaml .Values.rbac.extraPermissions.analyzer | nindent 4 }}
+    {{- end }}
+
+{{/* Normalizer Role */}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ template "blackpoint.fullname" . }}-normalizer-role
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ template "blackpoint.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: normalizer
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+spec:
+  rules:
+    - apiGroups: [""]
+      resources: ["configmaps", "secrets"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: [""]
+      resources: ["pods"]
+      verbs: ["get"]
+    - apiGroups: ["metrics.k8s.io"]
+      resources: ["pods"]
+      verbs: ["get", "list"]
+    {{- if .Values.rbac.extraPermissions.normalizer }}
+    {{- toYaml .Values.rbac.extraPermissions.normalizer | nindent 4 }}
+    {{- end }}
+
+{{/* Collector RoleBinding */}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ template "blackpoint.fullname" . }}-collector-rolebinding
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ template "blackpoint.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: collector
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+subjects:
+- kind: ServiceAccount
+  name: {{ template "blackpoint.serviceAccountName" . }}-collector
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ template "blackpoint.fullname" . }}-collector-role
+  apiGroup: rbac.authorization.k8s.io
+
+{{/* Analyzer RoleBinding */}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ template "blackpoint.fullname" . }}-analyzer-rolebinding
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ template "blackpoint.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: analyzer
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+subjects:
+- kind: ServiceAccount
+  name: {{ template "blackpoint.serviceAccountName" . }}-analyzer
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ template "blackpoint.fullname" . }}-analyzer-role
+  apiGroup: rbac.authorization.k8s.io
+
+{{/* Normalizer RoleBinding */}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ template "blackpoint.fullname" . }}-normalizer-rolebinding
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ template "blackpoint.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: normalizer
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
+subjects:
+- kind: ServiceAccount
+  name: {{ template "blackpoint.serviceAccountName" . }}-normalizer
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ template "blackpoint.fullname" . }}-normalizer-role
+  apiGroup: rbac.authorization.k8s.io
