@@ -1,0 +1,42 @@
+apiVersion: v2
+name: blackpoint
+description: BlackPoint Security Integration Framework Helm Chart for deploying and managing security data collection, processing, and intelligence generation components
+version: 1.0.0
+appVersion: "1.0.0"
+type: application
+
+keywords:
+  - security
+  - integration
+  - monitoring
+  - analytics
+  - data-processing
+  - kubernetes
+  - observability
+
+maintainers:
+  - name: BlackPoint Security
+    email: support@blackpoint.com
+    url: https://blackpoint.com
+
+dependencies:
+  - name: prometheus
+    version: 15.0.0
+    repository: https://prometheus-community.github.io/helm-charts
+    condition: prometheus.enabled
+    tags:
+      - monitoring
+
+  - name: grafana
+    version: 6.0.0
+    repository: https://grafana.github.io/helm-charts
+    condition: grafana.enabled
+    tags:
+      - monitoring
+
+  - name: redis
+    version: 17.0.0
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+    tags:
+      - cache
