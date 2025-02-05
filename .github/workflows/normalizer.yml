@@ -1,0 +1,182 @@
+name: Normalizer Service CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/backend/cmd/normalizer/**'
+      - 'src/backend/internal/normalizer/**'
+      - 'src/backend/pkg/silver/**'
+      - 'src/backend/deploy/kubernetes/normalizer-*.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/backend/cmd/normalizer/**'
+      - 'src/backend/internal/normalizer/**'
+      - 'src/backend/pkg/silver/**'
+      - 'src/backend/deploy/kubernetes/normalizer-*.yaml'
+
+env:
+  REGISTRY: blackpoint
+  IMAGE_NAME: normalizer
+  GO_VERSION: '1.21'
+  TEST_TIMEOUT: '10m'
+  COVERAGE_THRESHOLD: '80'
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
+
+      - name: Run unit tests
+        run: |
+          go test -v -race -timeout ${{ env.TEST_TIMEOUT }} -coverprofile=coverage.out ./src/backend/cmd/normalizer/... ./src/backend/internal/normalizer/... ./src/backend/pkg/silver/...
+
+      - name: Verify coverage
+        run: |
+          coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+          if (( $(echo "$coverage < ${{ env.COVERAGE_THRESHOLD }}" | bc -l) )); then
+            echo "Test coverage $coverage% is below threshold ${{ env.COVERAGE_THRESHOLD }}%"
+            exit 1
+          fi
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: coverage.out
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Run Snyk scan
+        uses: snyk/actions/golang@v1.1.0
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+
+      - name: Generate SBOM
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          syft src/backend -o spdx-json > sbom.json
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-reports
+          path: |
+            snyk-report.json
+            sbom.json
+
+  build:
+    name: Build and Push
+    needs: [test, security-scan]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        platform: [linux/amd64, linux/arm64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ secrets.REGISTRY_USERNAME }}
+          password: ${{ secrets.REGISTRY_PASSWORD }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: ./src/backend
+          file: ./src/backend/Dockerfile
+          platforms: ${{ matrix.platform }}
+          push: true
+          build-args: |
+            SERVICE=normalizer
+            VERSION=${{ github.sha }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+
+      - name: Verify image size
+        run: |
+          size=$(docker image inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} --format='{{.Size}}')
+          max_size=104857600  # 100MB in bytes
+          if [ $size -gt $max_size ]; then
+            echo "Image size $size bytes exceeds limit of $max_size bytes"
+            exit 1
+          fi
+
+  deploy:
+    name: Deploy
+    needs: [build]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://api.blackpoint.security
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure kubectl
+        uses: azure/k8s-set-context@v3
+        with:
+          kubeconfig: ${{ secrets.KUBECONFIG }}
+
+      - name: Update deployment
+        run: |
+          kubectl set image deployment/normalizer normalizer=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }} -n blackpoint-system
+
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/normalizer -n blackpoint-system --timeout=5m
+
+      - name: Run health checks
+        run: |
+          endpoint="https://api.blackpoint.security/health"
+          for i in {1..5}; do
+            response=$(curl -s -o /dev/null -w "%{http_code}" $endpoint)
+            if [ $response -eq 200 ]; then
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "Health check failed after 5 attempts"
+          exit 1
