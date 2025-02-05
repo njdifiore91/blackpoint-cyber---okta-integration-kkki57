@@ -1,0 +1,22 @@
+github.com/stretchr/testify v1.8.4 h1:7/cgXCrjE07qS1IZP8T1c3lnJ2A8FB6jgWHrIwvqRPw=
+
+go.k6.io/k6 v0.46.0 h1:1bB9oKJX6jZ/Y9xHmCfcPE8uGCzEhwZ7Vj5xPqZdw5s=
+go.k6.io/k6 v0.46.0 h1:qUsGW7Fu5M5Fda8IQrp9Xw4BYpZ6WZnQC5jkE9FSw4=
+
+github.com/golang/mock v1.6.0 h1:jGI+RdpMXMrR+GQ8wrL9CVxRPUHGZF6y9BeMi2sHg8=
+github.com/golang/mock v1.6.0 h1:ErTB+efbowRARo13NNdxyJji2egdxLGQhRaY+DUumQc=
+
+github.com/testcontainers/testcontainers-go v0.26.0 h1:gF9Le0jJZEY5LYgGJZPwE0JtFuVNF8aIzpMKNDKlvA=
+github.com/testcontainers/testcontainers-go v0.26.0 h1:0uHJ8XYGzlL/Ijc4SvUoHyOBl+Lf+JZGEzTyDXxJo4=
+
+github.com/prometheus/client_golang v1.14.0 h1:3dEPyaDGJGXrSZ1WxZBBPi/95vYo/nA4FBzPq8MJpxY=
+github.com/prometheus/client_golang v1.14.0 h1:nJgUUZoKhU1Ry+tpnFQJLvR6GfVxzP8pNgzBYsQHXw=
+
+github.com/confluentinc/confluent-kafka-go v1.9.0 h1:PTJ8gZE8JyRE/FJUmVZ8F+rjHuTLGH3fqMF4JUZLYzY=
+github.com/confluentinc/confluent-kafka-go v1.9.0 h1:We7PaYVF2M/1Ua/WQxnYQXmA26RV8AJ9RjR3Qm8Qhc=
+
+github.com/aws/aws-sdk-go-v2 v1.17.0 h1:ytwTPBG6fXHHZwf5KXw1wcnJWxJBkVGb5uh+4YGwRJw=
+github.com/aws/aws-sdk-go-v2 v1.17.0 h1:La3cFJ8HqH5DG6EskG6HJ1Ymb6F5KjR1Qw6YPm7RzA=
+
+go.uber.org/zap v1.24.0 h1:2kMP+WWQ8aoFoedH3T2sq6iJ2yDWpHbP0f6MQbS9Gkg=
+go.uber.org/zap v1.24.0 h1:FiJd5l1UOLj0wCgbSE0rwwXHzEdAZS6hiiSnxJN/D60=
