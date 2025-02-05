@@ -1,0 +1,147 @@
+.TH BLACKPOINT-AUTH 1 "January 2024" "BlackPoint Security" "BlackPoint CLI Manual"
+.SH NAME
+blackpoint-auth \- secure authentication management commands for BlackPoint Security CLI
+.SH SYNOPSIS
+.B blackpoint auth login
+[\fB\-\-api\-key\fR \fIkey\fR]
+[\fB\-\-mfa\-token\fR \fItoken\fR]
+[\fB\-\-secure\-mode\fR]
+.PP
+.B blackpoint auth logout
+[\fB\-\-all\-sessions\fR]
+[\fB\-\-secure\-wipe\fR]
+.PP
+.B blackpoint auth status
+[\fB\-\-verbose\fR]
+[\fB\-\-json\fR]
+.PP
+.B blackpoint auth refresh
+[\fB\-\-force\fR]
+[\fB\-\-validate\fR]
+.PP
+.B blackpoint auth configure
+[\fB\-\-config\-file\fR \fIpath\fR]
+[\fB\-\-secure\-storage\fR \fItype\fR]
+[\fB\-\-rotation\-policy\fR \fIdays\fR]
+.SH DESCRIPTION
+The \fBblackpoint auth\fR command provides secure authentication management for the BlackPoint Security CLI. It implements OAuth 2.0 + JWT token-based authentication with a 1-hour token lifetime and API key authentication with 90-day rotation policy.
+.PP
+All authentication operations enforce strict security controls including encrypted credential storage, secure token management, and comprehensive audit logging.
+.SH COMMANDS
+.SS login
+Authenticate securely with the BlackPoint Security platform using either OAuth 2.0 + JWT or API key authentication.
+.PP
+Options:
+.TP
+\fB\-\-api\-key\fR \fIkey\fR
+Authenticate using a 90-day rotating API key. Key must be at least 32 characters.
+.TP
+\fB\-\-mfa\-token\fR \fItoken\fR
+Provide multi-factor authentication token for enhanced security.
+.TP
+\fB\-\-secure\-mode\fR
+Enable additional security controls including hardware-backed key storage.
+.SS logout
+Securely clear stored authentication credentials, tokens, and session data.
+.PP
+Options:
+.TP
+\fB\-\-all\-sessions\fR
+Invalidate all active sessions across devices.
+.TP
+\fB\-\-secure\-wipe\fR
+Ensure secure deletion of credentials using multiple overwrites.
+.SS status
+Display current authentication status, token validity, and security information.
+.PP
+Options:
+.TP
+\fB\-\-verbose\fR
+Show detailed security information including token expiry and permissions.
+.TP
+\fB\-\-json\fR
+Output status information in JSON format.
+.SS refresh
+Securely refresh the current access token using the refresh token (24-hour lifetime).
+.PP
+Options:
+.TP
+\fB\-\-force\fR
+Force token refresh even if current token is still valid.
+.TP
+\fB\-\-validate\fR
+Validate token integrity before refresh operation.
+.SS configure
+Configure authentication settings with secure credential storage.
+.PP
+Options:
+.TP
+\fB\-\-config\-file\fR \fIpath\fR
+Specify custom configuration file location (must be secure path).
+.TP
+\fB\-\-secure\-storage\fR \fItype\fR
+Configure encrypted storage backend (keyring, file, hardware).
+.TP
+\fB\-\-rotation\-policy\fR \fIdays\fR
+Set credential rotation policy (30-90 days).
+.SH FILES
+.TP
+\fB~/.blackpoint/auth.json\fR
+Encrypted authentication configuration file (0600 permissions).
+.TP
+\fB~/.blackpoint/credentials\fR
+Secure credential storage with hardware encryption support.
+.TP
+\fB~/.blackpoint/tokens\fR
+Encrypted token storage with secure deletion.
+.SH ENVIRONMENT
+.TP
+\fBBLACKPOINT_CONFIG_HOME\fR
+Override default configuration directory (must be secure location).
+.TP
+\fBBLACKPOINT_API_KEY\fR
+API key for non-interactive authentication (use with caution).
+.TP
+\fBBLACKPOINT_SECURE_MODE\fR
+Enable additional security controls.
+.TP
+\fBBLACKPOINT_TOKEN_LIFETIME\fR
+Override default token lifetime (max 1 hour).
+.SH EXIT STATUS
+.TP
+\fB0\fR
+Success.
+.TP
+\fB1\fR
+Authentication failure.
+.TP
+\fB2\fR
+Configuration error.
+.TP
+\fB3\fR
+Security validation failure.
+.TP
+\fB4\fR
+Token expired or invalid.
+.TP
+\fB5\fR
+Secure storage error.
+.SH SECURITY CONSIDERATIONS
+.PP
+\fBToken Security:\fR
+Access tokens have a 1-hour lifetime and refresh tokens have a 24-hour lifetime. All tokens use JWT format with HMAC-SHA256 signatures.
+.PP
+\fBAPI Key Security:\fR
+API keys must be at least 32 characters and are automatically rotated every 90 days. Keys are stored using hardware-backed encryption when available.
+.PP
+\fBCredential Storage:\fR
+All credentials and tokens are stored encrypted at rest using AES-256-GCM. Files use 0600 permissions and secure deletion.
+.PP
+\fBAudit Logging:\fR
+All authentication operations are logged with timestamps and operation details (excluding sensitive data).
+.SH SEE ALSO
+blackpoint(1), blackpoint-config(1), blackpoint-integration(1), blackpoint-security(1)
+.SH BUGS
+Report bugs at: https://github.com/blackpoint/cli/issues
+.SH AUTHOR
+BlackPoint Security (support@blackpoint.com)
