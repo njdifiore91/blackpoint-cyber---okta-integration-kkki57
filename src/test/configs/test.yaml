@@ -1,0 +1,97 @@
+# BlackPoint Security Integration Framework Test Configuration
+# Version: 1.0.0
+# Purpose: Core test configuration defining comprehensive test parameters, thresholds,
+# and settings across all test types with environment-specific overrides
+
+# Test execution timeouts for different test categories
+test_timeouts:
+  default: 5m
+  setup: 2m
+  teardown: 2m
+  unit: 30s
+  integration: 5m
+  e2e: 10m
+  performance: 15m
+  security: 20m
+
+# Processing latency thresholds per technical specifications
+latency_thresholds:
+  bronze: 1s    # Bronze tier requirement: <1s
+  silver: 5s    # Silver tier requirement: <5s
+  gold: 30s     # Gold tier requirement: <30s
+  percentile_95: 1.5x  # Maximum allowed degradation at 95th percentile
+  percentile_99: 2x    # Maximum allowed degradation at 99th percentile
+
+# Performance testing requirements and thresholds
+performance_requirements:
+  min_throughput: 1000          # Minimum events/second per client
+  min_accuracy: 0.8             # Minimum 80% accuracy requirement
+  max_concurrent_clients: 100   # Maximum concurrent client support
+  batch_size: 1000             # Standard event batch size
+  ramp_up_time: 30s            # Load test ramp-up period
+  steady_state_time: 5m        # Steady state test duration
+  cool_down_time: 30s          # Cool-down period
+
+# Retry configuration for handling transient failures
+retry_settings:
+  max_attempts: 3              # Maximum retry attempts
+  delay: 5s                    # Initial retry delay
+  backoff_factor: 2.0         # Exponential backoff multiplier
+  jitter: 500ms               # Random jitter for retry timing
+
+# Test validation rules and requirements
+validation_rules:
+  schema_validation: true      # Enforce schema validation
+  data_quality_checks: true    # Enable data quality validation
+  performance_monitoring: true # Enable performance metrics
+  security_scanning: true      # Enable security validation
+
+# Test artifact and resource paths
+test_paths:
+  data: test/data             # Test data directory
+  configs: test/configs       # Test configuration files
+  fixtures: test/fixtures     # Test fixtures
+  reports: test/reports       # Test result reports
+  artifacts: test/artifacts   # Test artifacts storage
+
+# Logging configuration
+logging:
+  level: info
+  format: json
+  output: stdout
+  file_output: /var/log/blackpoint/test.log
+  rotation:
+    max_size: 100MB
+    max_age: 7d
+    max_backups: 5
+    compress: true
+
+# Environment-specific configuration overrides
+environment_overrides:
+  development:
+    logging:
+      level: debug
+    performance_requirements:
+      min_throughput: 500     # Reduced throughput for development
+      min_accuracy: 0.7       # Relaxed accuracy threshold
+
+  staging:
+    performance_requirements:
+      min_throughput: 800     # Increased throughput for staging
+      min_accuracy: 0.75      # Intermediate accuracy threshold
+    test_timeouts:
+      performance: 10m        # Reduced performance test duration
+
+  production:
+    validation_rules:
+      schema_validation: true
+      data_quality_checks: true
+      performance_monitoring: true
+      security_scanning: true
+    performance_requirements:
+      min_throughput: 1000    # Full production throughput requirement
+      min_accuracy: 0.8       # Full production accuracy requirement
+    test_timeouts:
+      performance: 15m        # Full performance test duration
+    logging:
+      level: warn            # Reduced logging in production
