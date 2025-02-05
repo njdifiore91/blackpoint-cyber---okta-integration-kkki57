@@ -1,0 +1,124 @@
+{{/* Collector Deployment Template */}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "blackpoint.fullname" . }}-collector
+  labels:
+    {{- include "blackpoint.labels" . | nindent 4 }}
+  annotations:
+    checksum/config: {{ include (print $.Template.BasePath "/configmaps.yaml") . | sha256sum }}
+    prometheus.io/scrape: "{{ .Values.global.monitoring.prometheus.enabled }}"
+    prometheus.io/port: "{{ .Values.collector.service.metricsPort }}"
+    prometheus.io/path: "/metrics"
+spec:
+  replicas: {{ .Values.collector.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "blackpoint.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: collector
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        {{- include "blackpoint.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: collector
+      annotations:
+        prometheus.io/scrape: "{{ .Values.global.monitoring.prometheus.enabled }}"
+        prometheus.io/port: "{{ .Values.collector.service.metricsPort }}"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        {{- include "blackpoint.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: collector
+          image: "{{ .Values.global.image.registry }}/collector:{{ .Values.global.image.tag }}"
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          securityContext:
+            {{- include "blackpoint.containerSecurityContext" . | nindent 12 }}
+          env:
+            {{- include "blackpoint.commonEnvVars" . | nindent 12 }}
+            - name: COLLECTOR_PORT
+              value: "{{ .Values.collector.service.port }}"
+            - name: METRICS_PORT
+              value: "{{ .Values.collector.service.metricsPort }}"
+          ports:
+            - name: http
+              containerPort: {{ .Values.collector.service.port }}
+              protocol: TCP
+            - name: metrics
+              containerPort: {{ .Values.collector.service.metricsPort }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.collector.resources | nindent 12 }}
+          volumeMounts:
+            - name: config
+              mountPath: /etc/blackpoint/collector
+              readOnly: true
+            - name: tls
+              mountPath: /etc/blackpoint/tls
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+              scheme: HTTPS
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: http
+              scheme: HTTPS
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          startupProbe:
+            httpGet:
+              path: /ready
+              port: http
+              scheme: HTTPS
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 12
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "blackpoint.fullname" . }}-collector-config
+        - name: tls
+          secret:
+            secretName: {{ include "blackpoint.fullname" . }}-collector-tls
+        - name: tmp
+          emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    {{- include "blackpoint.selectorLabels" . | nindent 20 }}
+                    app.kubernetes.io/component: collector
+                topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/arch
+                    operator: In
+                    values:
+                      - amd64
+      terminationGracePeriodSeconds: 60
+      {{- if .Values.global.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml .Values.global.image.pullSecrets | nindent 8 }}
+      {{- end }}
