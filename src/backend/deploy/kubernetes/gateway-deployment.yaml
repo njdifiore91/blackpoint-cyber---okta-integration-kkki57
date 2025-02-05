@@ -1,0 +1,121 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blackpoint-gateway
+  namespace: blackpoint-system
+  labels:
+    app: blackpoint-gateway
+    component: api-gateway
+    part-of: blackpoint-security
+    tier: frontend
+    managed-by: kubernetes
+    version: v1
+  annotations:
+    kubernetes.io/description: "Kong API Gateway deployment for BlackPoint Security Integration Framework"
+    kubernetes.io/change-cause: "Initial deployment of Kong API Gateway"
+
+spec:
+  replicas: 3  # High availability across multiple AZs
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0  # Zero-downtime deployments
+      
+  selector:
+    matchLabels:
+      app: blackpoint-gateway
+      
+  template:
+    metadata:
+      labels:
+        app: blackpoint-gateway
+        component: api-gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8100"
+        prometheus.io/path: "/metrics"
+        
+    spec:
+      containers:
+      - name: kong
+        image: kong:3.4-alpine  # Version pinned for stability
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        - name: https
+          containerPort: 8443
+          protocol: TCP
+        - name: metrics
+          containerPort: 8100
+          protocol: TCP
+          
+        env:
+        - name: KONG_DATABASE
+          value: "off"  # Using DB-less mode for declarative configuration
+        - name: KONG_DECLARATIVE_CONFIG
+          value: "/etc/kong/kong.yaml"
+        - name: KONG_PROXY_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_ADMIN_ACCESS_LOG
+          value: "/dev/stdout"
+        - name: KONG_PROXY_ERROR_LOG
+          value: "/dev/stderr"
+        - name: KONG_ADMIN_ERROR_LOG
+          value: "/dev/stderr"
+          
+        resources:
+          requests:
+            cpu: "500m"
+            memory: "512Mi"
+          limits:
+            cpu: "2"
+            memory: "2Gi"
+            
+        volumeMounts:
+        - name: kong-config
+          mountPath: /etc/kong
+          readOnly: true
+          
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 30
+          timeoutSeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+          
+        readinessProbe:
+          httpGet:
+            path: /status
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 15
+          timeoutSeconds: 5
+          periodSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+          
+      volumes:
+      - name: kong-config
+        configMap:
+          name: kong-config
+          
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsNonRoot: true
+        
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: blackpoint-gateway
+              topologyKey: kubernetes.io/hostname  # Spread pods across nodes
