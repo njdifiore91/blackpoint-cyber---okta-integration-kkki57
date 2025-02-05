@@ -1,0 +1,140 @@
+# Kubernetes RBAC configuration for BlackPoint Security Integration Framework
+# Version: v1.25+
+# Purpose: Define fine-grained RBAC policies with least-privilege access model
+
+# Collector Role - Minimal permissions for data collection service
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: collector-role
+  namespace: blackpoint-system
+  labels:
+    app.kubernetes.io/name: blackpoint
+    app.kubernetes.io/component: collector
+    app.kubernetes.io/part-of: security-integration-framework
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["collector-config", "integration-rules"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["collector-credentials"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["pods"]
+  resourceNames: ["collector-*"]
+  verbs: ["get"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+# Collector RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: collector-rolebinding
+  namespace: blackpoint-system
+  labels:
+    app.kubernetes.io/name: blackpoint
+    app.kubernetes.io/component: collector
+    app.kubernetes.io/part-of: security-integration-framework
+subjects:
+- kind: ServiceAccount
+  name: collector
+  namespace: blackpoint-system
+roleRef:
+  kind: Role
+  name: collector-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Analyzer Role - Permissions for security analysis operations
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: analyzer-role
+  namespace: blackpoint-system
+  labels:
+    app.kubernetes.io/name: blackpoint
+    app.kubernetes.io/component: analyzer
+    app.kubernetes.io/part-of: security-integration-framework
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["analyzer-config", "analysis-rules"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["analyzer-credentials"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["pods", "services"]
+  verbs: ["get", "list"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+# Analyzer RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: analyzer-rolebinding
+  namespace: blackpoint-system
+  labels:
+    app.kubernetes.io/name: blackpoint
+    app.kubernetes.io/component: analyzer
+    app.kubernetes.io/part-of: security-integration-framework
+subjects:
+- kind: ServiceAccount
+  name: analyzer
+  namespace: blackpoint-system
+roleRef:
+  kind: Role
+  name: analyzer-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# Normalizer Role - Read-only permissions for data normalization
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: normalizer-role
+  namespace: blackpoint-system
+  labels:
+    app.kubernetes.io/name: blackpoint
+    app.kubernetes.io/component: normalizer
+    app.kubernetes.io/part-of: security-integration-framework
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  resourceNames: ["normalizer-config", "normalization-rules"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["normalizer-credentials"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["pods"]
+  resourceNames: ["normalizer-*"]
+  verbs: ["get"]
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods"]
+  verbs: ["get", "list"]
+---
+# Normalizer RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: normalizer-rolebinding
+  namespace: blackpoint-system
+  labels:
+    app.kubernetes.io/name: blackpoint
+    app.kubernetes.io/component: normalizer
+    app.kubernetes.io/part-of: security-integration-framework
+subjects:
+- kind: ServiceAccount
+  name: normalizer
+  namespace: blackpoint-system
+roleRef:
+  kind: Role
+  name: normalizer-role
+  apiGroup: rbac.authorization.k8s.io
