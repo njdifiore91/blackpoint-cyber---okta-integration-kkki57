@@ -1,0 +1,219 @@
+name: Security Testing & Validation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * *'  # Daily security scans
+
+env:
+  GO_VERSION: '1.21'
+  SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  TEST_OAUTH_CLIENT_ID: ${{ secrets.TEST_OAUTH_CLIENT_ID }}
+  TEST_OAUTH_CLIENT_SECRET: ${{ secrets.TEST_OAUTH_CLIENT_SECRET }}
+  TEST_KMS_KEY_ID: ${{ secrets.TEST_KMS_KEY_ID }}
+
+jobs:
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run Snyk Security Scan
+        uses: snyk/actions/golang@v1.1.0
+        env:
+          SNYK_TOKEN: ${{ env.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high --fail-on=upgradable
+
+      - name: Run Trivy Scan
+        uses: aquasecurity/trivy-action@0.12.0
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+          timeout: '10m'
+
+      - name: Upload Scan Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-scan-results
+          path: |
+            trivy-results.sarif
+            snyk-results.json
+          retention-days: 30
+
+  security-tests:
+    name: Security Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: security-scan
+
+    services:
+      redis:
+        image: redis:7.0-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Install test dependencies
+        run: |
+          go mod download
+          go install gotest.tools/gotestsum@latest
+
+      - name: Run Authentication Tests
+        run: |
+          gotestsum --format pkgname \
+            --junitfile auth-test-results.xml \
+            -- -v -timeout 10m ./src/test/security/auth_test.go
+        env:
+          TEST_OAUTH_CLIENT_ID: ${{ env.TEST_OAUTH_CLIENT_ID }}
+          TEST_OAUTH_CLIENT_SECRET: ${{ env.TEST_OAUTH_CLIENT_SECRET }}
+
+      - name: Run Encryption Tests
+        run: |
+          gotestsum --format pkgname \
+            --junitfile encryption-test-results.xml \
+            -- -v -timeout 10m ./src/test/security/encryption_test.go
+        env:
+          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          TEST_KMS_KEY_ID: ${{ env.TEST_KMS_KEY_ID }}
+
+      - name: Run RBAC Tests
+        run: |
+          gotestsum --format pkgname \
+            --junitfile rbac-test-results.xml \
+            -- -v -timeout 10m ./src/test/security/rbac_test.go
+
+      - name: Validate Test Coverage
+        run: |
+          go test -coverprofile=coverage.out ./src/test/security/...
+          go tool cover -func=coverage.out | tee coverage.txt
+          if [[ $(grep "total:" coverage.txt | awk '{print $3}' | sed 's/%//') < 80 ]]; then
+            echo "Test coverage below required 80%"
+            exit 1
+          fi
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-test-results
+          path: |
+            *-test-results.xml
+            coverage.out
+            coverage.txt
+          retention-days: 30
+
+      - name: Report Test Results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Security Test Results
+          path: '*-test-results.xml'
+          reporter: java-junit
+          fail-on-error: true
+
+  compliance-validation:
+    name: Compliance Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: security-tests
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Validate SOC2 Controls
+        run: |
+          go test -v -tags=compliance ./src/test/security/... \
+            -run "TestSOC2Controls|TestAuditLogging"
+
+      - name: Validate GDPR Requirements
+        run: |
+          go test -v -tags=compliance ./src/test/security/... \
+            -run "TestDataPrivacy|TestDataEncryption"
+
+      - name: Validate ISO27001 Controls
+        run: |
+          go test -v -tags=compliance ./src/test/security/... \
+            -run "TestAccessControl|TestCryptography"
+
+      - name: Generate Compliance Report
+        run: |
+          go run ./tools/compliance-report/main.go \
+            --output compliance-report.json \
+            --include-evidence
+
+      - name: Upload Compliance Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: compliance-report
+          path: compliance-report.json
+          retention-days: 90
+
+  security-metrics:
+    name: Security Metrics Collection
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [security-scan, security-tests, compliance-validation]
+    if: always()
+
+    steps:
+      - name: Download Test Results
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts
+
+      - name: Process Security Metrics
+        run: |
+          echo "Generating security metrics report..."
+          # Add metrics processing logic here
+
+      - name: Upload Security Metrics
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-metrics
+          path: security-metrics.json
+          retention-days: 90
+
+      - name: Send Metrics to Monitoring
+        if: always()
+        run: |
+          echo "Sending metrics to monitoring system..."
+          # Add metrics export logic here
