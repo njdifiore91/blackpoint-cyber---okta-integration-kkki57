@@ -1,0 +1,68 @@
+# Performance Test Configuration
+# Version: 1.0.0
+# This configuration defines comprehensive test parameters, thresholds, and scenarios
+# for measuring system performance across all tiers of the BlackPoint Security Integration Framework
+
+# Global test settings
+test_settings:
+  duration: 5m                    # Default test duration
+  warmup_duration: 30s           # Warmup period before measurements
+  concurrent_clients: [1, 10, 50, 100]  # Progressive load testing levels
+  event_batch_size: 1000         # Events per batch for throughput testing
+  sample_interval: 1s            # Metrics collection interval
+
+# Tier-specific throughput thresholds (events/second)
+throughput_thresholds:
+  bronze_tier: 1000    # Minimum events/sec for Bronze tier
+  silver_tier: 1000    # Minimum events/sec for Silver tier
+  gold_tier: 1000      # Minimum events/sec for Gold tier
+
+# Processing latency thresholds per tier
+latency_thresholds:
+  bronze_tier: 1s      # Maximum processing time for Bronze tier
+  silver_tier: 5s      # Maximum processing time for Silver tier
+  gold_tier: 30s       # Maximum processing time for Gold tier
+
+# Resource utilization limits
+resource_limits:
+  cpu_utilization: 80.0          # Maximum CPU usage percentage
+  memory_utilization: 75.0       # Maximum memory usage percentage
+  network_bandwidth: 1000.0      # Maximum network bandwidth MB/s
+
+# Platform availability requirement
+availability_threshold: 99.9     # Required platform uptime percentage
+
+# Test scenarios configuration
+test_scenarios:
+  # Basic single-client throughput testing
+  single_client:
+    enabled: true
+    duration: 5m
+  
+  # Multi-client concurrent load testing
+  concurrent_clients:
+    enabled: true
+    duration: 10m
+    client_counts: [10, 50, 100]  # Progressive client count testing
+  
+  # Sustained load testing
+  sustained_load:
+    enabled: true
+    duration: 30m
+    target_throughput: 1000       # Target events/second
+  
+  # Burst load testing
+  burst_load:
+    enabled: true
+    duration: 5m
+    burst_duration: 30s
+    burst_multiplier: 2.0         # Burst load multiplier
+
+# Test reporting configuration
+reporting:
+  metrics_format: 
+    - json
+    - prometheus
+  output_directory: /var/log/blackpoint/performance
+  include_graphs: true
+  detailed_statistics: true
