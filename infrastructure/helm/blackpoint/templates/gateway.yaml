@@ -1,0 +1,215 @@
+# Kong API Gateway Deployment Template
+# Version: 3.5.0
+# Purpose: Production-grade API Gateway deployment with HA, security, and monitoring
+
+---
+# Gateway Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "blackpoint.fullname" . }}-gateway
+  labels:
+    {{- include "blackpoint.labels" . | nindent 4 }}
+  annotations:
+    {{- include "blackpoint.annotations" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.gateway.replicaCount | default 3 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      {{- include "blackpoint.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
+  template:
+    metadata:
+      labels:
+        {{- include "blackpoint.labels" . | nindent 8 }}
+        app.kubernetes.io/component: gateway
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8100"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: {{ include "blackpoint.serviceAccountName" . }}
+      securityContext:
+        {{- include "blackpoint.podSecurityContext" . | nindent 8 }}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+              - key: app.kubernetes.io/component
+                operator: In
+                values:
+                - gateway
+            topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/component: gateway
+      containers:
+      - name: kong
+        image: kong:3.5.0
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          {{- include "blackpoint.containerSecurityContext" . | nindent 10 }}
+        ports:
+        - name: proxy
+          containerPort: 8000
+          protocol: TCP
+        - name: proxy-ssl
+          containerPort: 8443
+          protocol: TCP
+        - name: admin
+          containerPort: 8001
+          protocol: TCP
+        - name: metrics
+          containerPort: 8100
+          protocol: TCP
+        resources:
+          limits:
+            cpu: "2"
+            memory: 4Gi
+          requests:
+            cpu: "1"
+            memory: 2Gi
+        env:
+        {{- include "blackpoint.commonEnvVars" . | nindent 8 }}
+        - name: KONG_DATABASE
+          value: "off"
+        - name: KONG_PROXY_ACCESS_LOG
+          value: /dev/stdout
+        - name: KONG_ADMIN_ACCESS_LOG
+          value: /dev/stdout
+        - name: KONG_PROXY_ERROR_LOG
+          value: /dev/stderr
+        - name: KONG_ADMIN_ERROR_LOG
+          value: /dev/stderr
+        - name: KONG_ADMIN_LISTEN
+          value: "127.0.0.1:8001"
+        - name: KONG_PROXY_LISTEN
+          value: "0.0.0.0:8000, 0.0.0.0:8443 ssl"
+        - name: KONG_STATUS_LISTEN
+          value: "0.0.0.0:8100"
+        - name: KONG_PLUGINS
+          value: "bundled,rate-limiting,oauth2,cors,prometheus"
+        livenessProbe:
+          httpGet:
+            path: /status
+            port: 8100
+          initialDelaySeconds: 15
+          timeoutSeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /status
+            port: 8100
+          initialDelaySeconds: 15
+          timeoutSeconds: 5
+          periodSeconds: 10
+        startupProbe:
+          httpGet:
+            path: /status
+            port: 8100
+          failureThreshold: 30
+          periodSeconds: 10
+        volumeMounts:
+        - name: kong-config
+          mountPath: /kong/declarative
+          readOnly: true
+        - name: ssl-certs
+          mountPath: /kong/ssl
+          readOnly: true
+      volumes:
+      - name: kong-config
+        configMap:
+          name: {{ include "blackpoint.fullname" . }}-gateway-config
+      - name: ssl-certs
+        secret:
+          secretName: {{ include "blackpoint.fullname" . }}-gateway-certs
+
+---
+# Gateway Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "blackpoint.fullname" . }}-gateway
+  labels:
+    {{- include "blackpoint.labels" . | nindent 4 }}
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: {{ .Values.gateway.service.sslCertArn | quote }}
+spec:
+  type: LoadBalancer
+  ports:
+  - name: proxy
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  - name: proxy-ssl
+    port: 443
+    targetPort: 8443
+    protocol: TCP
+  - name: metrics
+    port: 8100
+    targetPort: 8100
+    protocol: TCP
+  selector:
+    {{- include "blackpoint.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+
+---
+# Gateway HorizontalPodAutoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "blackpoint.fullname" . }}-gateway
+  labels:
+    {{- include "blackpoint.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "blackpoint.fullname" . }}-gateway
+  minReplicas: {{ .Values.gateway.autoscaling.minReplicas | default 3 }}
+  maxReplicas: {{ .Values.gateway.autoscaling.maxReplicas | default 10 }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.gateway.autoscaling.targetCPUUtilization | default 75 }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.gateway.autoscaling.targetMemoryUtilization | default 75 }}
+
+---
+# Gateway PodDisruptionBudget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "blackpoint.fullname" . }}-gateway
+  labels:
+    {{- include "blackpoint.labels" . | nindent 4 }}
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      {{- include "blackpoint.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: gateway
