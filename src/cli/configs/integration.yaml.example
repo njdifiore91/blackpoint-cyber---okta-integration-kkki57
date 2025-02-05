@@ -1,0 +1,162 @@
+# BlackPoint Security Integration Framework Configuration Template
+# Version: 1.0.0
+# This configuration template provides a comprehensive example for setting up
+# security platform integrations with best practices and security controls.
+
+# Integration name must be unique and follow naming convention:
+# - Start with a letter
+# - Use only letters, numbers, hyphens, and underscores
+# - Length: 3-64 characters
+name: example-aws-security
+
+# Platform type must be one of:
+# aws, azure, gcp, okta, auth0, crowdstrike, sentinelone,
+# microsoft365, cloudflare, paloalto
+platform_type: aws
+
+# Description provides context about the integration's purpose
+description: AWS Security Hub Integration Example
+
+# Main configuration section containing all integration settings
+config:
+  # Deployment environment (production, staging, development, dr)
+  environment: production
+
+  # Compliance and security controls
+  compliance:
+    # Data retention period (must be valid duration: 30d, 90d, etc.)
+    data_retention: 90d
+    
+    # PII data handling (encrypt, mask, exclude)
+    pii_handling: encrypt
+    
+    # Enable comprehensive audit logging
+    audit_logging: true
+    
+    # Security controls
+    security:
+      # Encryption settings
+      encryption:
+        in_transit: true
+        at_rest: true
+        field_level: true
+      
+      # Access control settings
+      access_control:
+        rbac_enabled: true
+        min_privileges: true
+
+  # Authentication configuration
+  auth:
+    # Authentication type (oauth2, api_key, basic, certificate, jwt, saml)
+    type: oauth2
+    
+    # OAuth2 specific configuration
+    client_id: ${AWS_CLIENT_ID}
+    client_secret: ${AWS_CLIENT_SECRET}
+    token_url: https://oauth.aws.amazon.com/token
+    scopes:
+      - security-read
+      - events-read
+    
+    # Token configuration
+    token_lifetime: 3600
+    refresh_enabled: true
+
+  # Data collection configuration
+  collection:
+    # Collection mode (realtime, batch, hybrid)
+    mode: hybrid
+    
+    # Event types to collect
+    event_types:
+      - security_alerts
+      - user_activity
+      - system_logs
+    
+    # Batch collection schedule (required for batch/hybrid mode)
+    # Cron format: minute hour day month weekday
+    batch_schedule: "*/5 * * * *"
+    
+    # Rate limiting configuration
+    rate_limit:
+      requests_per_second: 100
+      burst: 150
+    
+    # Retry configuration
+    retry:
+      max_attempts: 3
+      initial_delay: 5s
+      max_delay: 30s
+
+  # Data processing configuration
+  processing:
+    # Event normalization settings
+    normalization:
+      enabled: true
+      rules: default
+    
+    # Data enrichment settings
+    enrichment:
+      enabled: true
+      sources:
+        - threat_intel
+        - asset_inventory
+    
+    # Field mapping configuration
+    field_mapping:
+      timestamp_field: event_time
+      severity_field: severity_level
+      source_field: event_source
+
+  # Monitoring and observability
+  monitoring:
+    # Health check configuration
+    health_check:
+      enabled: true
+      interval: 30s
+      timeout: 5s
+    
+    # Metrics collection
+    metrics:
+      enabled: true
+      export_interval: 60s
+      include_labels:
+        - integration_name
+        - environment
+    
+    # Logging configuration
+    logging:
+      level: info
+      format: json
+      include_trace: true
+
+  # Performance tuning
+  performance:
+    # Buffer sizes
+    buffer_size: 1000
+    batch_size: 100
+    
+    # Timeouts
+    operation_timeout: 30s
+    connection_timeout: 10s
+    
+    # Resource limits
+    max_concurrent_requests: 50
+    max_memory_mb: 512
+
+  # Error handling configuration
+  error_handling:
+    # Dead letter queue configuration
+    dead_letter:
+      enabled: true
+      max_retries: 3
+      
+    # Error notification configuration
+    notifications:
+      enabled: true
+      channels:
+        - type: email
+          recipients: ${ALERT_EMAIL}
+        - type: webhook
+          url: ${ALERT_WEBHOOK}
