@@ -1,0 +1,215 @@
+.TH BLACKPOINT-CONFIG 1 "January 2024" "BlackPoint Security" "BlackPoint Security Integration Framework"
+.SH NAME
+blackpoint-config \- manage BlackPoint Security Integration Framework CLI configuration settings
+.SH SYNOPSIS
+.B blackpoint-config set
+[\fB\-\-api\-endpoint\fR=\fIurl\fR]
+[\fB\-\-api\-timeout\fR=\fIduration\fR]
+[\fB\-\-api\-version\fR=\fIversion\fR]
+[\fB\-\-auth\-key\fR=\fIkey\fR]
+[\fB\-\-log\-level\fR=\fIlevel\fR]
+[\fB\-\-log\-format\fR=\fIformat\fR]
+[\fB\-\-output\-format\fR=\fIformat\fR]
+[\fB\-\-color\fR=\fItrue|false\fR]
+[\fB\-\-quiet\fR=\fItrue|false\fR]
+.PP
+.B blackpoint-config get
+[\fB\-\-format\fR=\fIformat\fR]
+[\fB\-\-section\fR=\fIsection\fR]
+.PP
+.B blackpoint-config validate
+[\fB\-\-strict\fR]
+[\fB\-\-section\fR=\fIsection\fR]
+.PP
+.B blackpoint-config reset
+[\fB\-\-section\fR=\fIsection\fR]
+[\fB\-\-force\fR]
+.SH DESCRIPTION
+The \fBblackpoint-config\fR command manages configuration settings for the BlackPoint Security Integration Framework CLI. It provides functionality to view, modify, validate, and reset configuration options with a focus on security and compliance requirements.
+.SH COMMANDS
+.TP
+.B set
+Set configuration values with secure validation
+.TP
+.B get
+Display current configuration with optional format and section filtering
+.TP
+.B validate
+Validate current configuration with optional strict mode
+.TP
+.B reset
+Reset configuration to default values with optional section targeting
+.SH OPTIONS
+.SS "API Configuration"
+.TP
+.BR \-\-api\-endpoint =\fIurl\fR
+URL of the BlackPoint API endpoint (HTTPS required)
+.br
+Default: https://api.blackpoint.security
+.br
+Validation: Must be valid HTTPS URL with optional port
+.TP
+.BR \-\-api\-timeout =\fIduration\fR
+Timeout duration for API requests
+.br
+Default: 30s
+.br
+Range: 5s-300s
+.TP
+.BR \-\-api\-version =\fIversion\fR
+API version to use
+.br
+Format: v{major}[.{minor}]
+.br
+Default: v1
+.SS "Authentication"
+.TP
+.BR \-\-auth\-key =\fIkey\fR
+Authentication key for API access
+.br
+Security: Stored encrypted in credentials file (0600 permissions)
+.br
+Validation: Must be at least 32 characters
+.SS "Logging"
+.TP
+.BR \-\-log\-level =\fIlevel\fR
+Logging verbosity level
+.br
+Values: debug, info, warn, error
+.br
+Default: info
+.TP
+.BR \-\-log\-format =\fIformat\fR
+Format of log output
+.br
+Values: text, json
+.br
+Default: text
+.SS "Output"
+.TP
+.BR \-\-output\-format =\fIformat\fR
+Output format for command results
+.br
+Values: json, yaml, table, text
+.br
+Default: json
+.TP
+.BR \-\-color =\fItrue|false\fR
+Enable or disable colored output
+.br
+Default: true
+.TP
+.BR \-\-quiet =\fItrue|false\fR
+Enable or disable quiet mode
+.br
+Default: false
+.SH SECURITY CONSIDERATIONS
+.TP
+\fBAPI Security\fR
+.RS
+\(bu API endpoint must use HTTPS with valid certificate
+.br
+\(bu Authentication keys are stored encrypted using system keyring
+.br
+\(bu Minimum API key length of 32 characters enforced
+.RE
+.TP
+\fBFile Security\fR
+.RS
+\(bu Configuration files use 0600 permissions
+.br
+\(bu Sensitive data is redacted in logs
+.br
+\(bu Token files stored with secure permissions
+.RE
+.TP
+\fBAudit Trail\fR
+.RS
+\(bu All configuration changes are logged
+.br
+\(bu Audit logs include timestamp and user information
+.RE
+.SH EXAMPLES
+.TP
+Configure API endpoint securely:
+.nf
+$ blackpoint-config set --api-endpoint=https://api.example.com --api-timeout=60s
+.fi
+.TP
+Configure secure logging:
+.nf
+$ blackpoint-config set --log-level=info --log-format=json
+.fi
+.TP
+View current configuration:
+.nf
+$ blackpoint-config get --format=yaml
+.fi
+.TP
+Validate configuration with strict checks:
+.nf
+$ blackpoint-config validate --strict
+.fi
+.TP
+Reset logging configuration:
+.nf
+$ blackpoint-config reset --section=logging --force
+.fi
+.SH FILES
+.TP
+.I ~/.blackpoint/config.yaml
+User configuration file (0600 permissions)
+.TP
+.I ~/.blackpoint/credentials
+Encrypted credentials storage (0600 permissions)
+.SH EXIT STATUS
+.TP
+.B 0
+Success
+.TP
+.B 1
+Configuration validation error
+.TP
+.B 2
+Command syntax error
+.TP
+.B 3
+I/O error
+.TP
+.B 4
+Permission error
+.TP
+.B 5
+Encryption error
+.TP
+.B 6
+Network error
+.TP
+.B 7
+Authentication error
+.SH TROUBLESHOOTING
+.TP
+1. File Permissions
+Verify configuration files have 0600 permissions
+.TP
+2. API Connectivity
+Check API endpoint HTTPS certificate validity
+.TP
+3. Authentication
+Validate authentication key format and length
+.TP
+4. Audit Logs
+Review audit logs for configuration changes
+.TP
+5. Keyring Access
+Ensure system keyring is accessible
+.SH SEE ALSO
+.BR blackpoint (1),
+.BR blackpoint-auth (1),
+.BR blackpoint-integration (1),
+.BR blackpoint-monitor (1),
+.BR blackpoint-security (7)
+.SH BUGS
+Report bugs at: https://github.com/blackpoint/security/issues
+.SH AUTHOR
+BlackPoint Security <support@blackpoint.security>
