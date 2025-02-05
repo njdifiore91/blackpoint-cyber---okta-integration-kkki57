@@ -1,0 +1,141 @@
+version: "3.8"
+
+services:
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      args:
+        GO_VERSION: "1.21"
+        TEST_DEPS_VERSION: "latest"
+    environment:
+      - TEST_ENVIRONMENT=test
+      - TEST_TIMEOUT=2h
+      - REDIS_URL=redis://redis:6379
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - AWS_ENDPOINT_URL=http://localstack:4566
+      - TEST_PARALLELISM=4
+      - PERFORMANCE_TEST_DURATION=30m
+      - ACCURACY_THRESHOLD=80
+      - LOG_LEVEL=debug
+    volumes:
+      - ./configs:/app/configs:ro
+      - ./scripts:/app/scripts:ro
+      - ./reports:/app/reports:rw
+    depends_on:
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      localstack:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: "4G"
+    healthcheck:
+      test: ["CMD", "/app/scripts/health_check.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - test-network
+
+  redis:
+    image: redis:7.0-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: "2G"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    networks:
+      - test-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    environment:
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_LOG_RETENTION_HOURS=24
+      - KAFKA_LOG_SEGMENT_BYTES=1073741824
+      - KAFKA_NUM_PARTITIONS=12
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: "4G"
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+  localstack:
+    image: localstack/localstack:latest
+    environment:
+      - SERVICES=s3,kms,dynamodb,sqs
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - AWS_DEFAULT_REGION=us-east-1
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack-data:/tmp/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: "4G"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: test-net
+      com.docker.network.bridge.enable_icc: "true"
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+
+volumes:
+  test-data:
+    driver: local
+    driver_opts:
+      type: none
+      device: /data/test-volumes
+      o: bind
+  redis-data:
+    driver: local
+  kafka-data:
+    driver: local
+  localstack-data:
+    driver: local
