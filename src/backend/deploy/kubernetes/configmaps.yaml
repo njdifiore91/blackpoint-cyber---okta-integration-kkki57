@@ -1,0 +1,169 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: analyzer-config
+  namespace: blackpoint
+  labels:
+    app: blackpoint
+    component: analyzer
+    tier: gold
+data:
+  analyzer.yaml: |
+    version: "1.0"
+    environment: "production"
+    log_level: "info"
+
+    detection:
+      rules:
+        timeout_seconds: 30
+        max_concurrent: 100
+        severity_threshold: 0.7
+        enabled_rules: ["default"]
+        validation:
+          schema_validation: true
+          input_sanitization: true
+      circuit_breaker:
+        max_failures: 5
+        reset_timeout: "5m"
+
+    correlation:
+      window_minutes: 15
+      max_events_per_window: 1000
+      min_correlation_confidence: 0.8
+      batch_size: 100
+      parallel_processors: 10
+
+    metrics:
+      enabled: true
+      collection_interval_seconds: 60
+      prometheus:
+        enabled: true
+        port: 9090
+        path: "/metrics"
+      alerting:
+        enabled: true
+        threshold_checks: true
+
+    storage:
+      type: "chaossearch"
+      retention_days: 90
+      index_pattern: "gold-alerts-*"
+      encryption:
+        enabled: true
+        key_rotation_days: 30
+      backup:
+        enabled: true
+        schedule: "0 0 * * *"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: collector-config
+  namespace: blackpoint
+  labels:
+    app: blackpoint
+    component: collector
+    tier: bronze
+data:
+  collector.yaml: |
+    server:
+      port: 8080
+      host: "0.0.0.0"
+      read_timeout: "5s"
+      write_timeout: "10s"
+      max_connections: 1000
+      keep_alive: true
+
+    collection:
+      buffer_size: 10000
+      batch_size: 1000
+      flush_interval: "1s"
+      collection_timeout: "5s"
+      parallel_collectors: 20
+      rate_limiting:
+        enabled: true
+        requests_per_second: 2000
+
+    validation:
+      max_event_size: 1048576
+      cache_duration: "1h"
+      strict_mode: true
+      schema_validation: true
+      input_sanitization: true
+      security_checks:
+        enabled: true
+        xss_protection: true
+        sql_injection_check: true
+
+    streaming:
+      topic: "bronze-events"
+      producer_config:
+        compression_type: "snappy"
+        batch_size: 1000
+        linger_ms: 100
+        retries: 3
+        acks: "all"
+        enable_idempotence: true
+      monitoring:
+        enabled: true
+        metrics_interval: "30s"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: normalizer-config
+  namespace: blackpoint
+  labels:
+    app: blackpoint
+    component: normalizer
+    tier: silver
+data:
+  normalizer.yaml: |
+    service:
+      name: "normalizer"
+      version: "1.0.0"
+      environment: "production"
+      log_level: "info"
+      metrics_enabled: true
+      health_check:
+        enabled: true
+        interval: "30s"
+
+    processing:
+      timeout: "5s"
+      max_retries: 3
+      retry_backoff: "100ms"
+      batch_size: 100
+      concurrent_processors: 10
+      circuit_breaker:
+        enabled: true
+        failure_threshold: 5
+        reset_timeout: "1m"
+
+    streaming:
+      consumer:
+        topic: "bronze-events"
+        group_id: "normalizer-group"
+        auto_offset_reset: "latest"
+        max_poll_records: 500
+        session_timeout_ms: 30000
+        heartbeat_interval_ms: 3000
+      producer:
+        topic: "silver-events"
+        compression_type: "snappy"
+        batch_size: 100
+        linger_ms: 10
+        retries: 3
+        acks: "all"
+
+    storage:
+      type: "chaossearch"
+      retention_days: 90
+      index_pattern: "silver-events-{yyyy.MM.dd}"
+      shards: 5
+      replicas: 2
+      encryption:
+        enabled: true
+        algorithm: "AES-256-GCM"
