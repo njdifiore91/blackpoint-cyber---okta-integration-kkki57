@@ -1,0 +1,209 @@
+name: Collector CI/CD
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ['v*']
+    paths:
+      - 'src/backend/cmd/collector/**'
+      - 'src/backend/internal/collector/**'
+      - 'src/backend/pkg/bronze/**'
+      - 'src/backend/Dockerfile'
+      - 'src/backend/go.mod'
+      - 'src/backend/go.sum'
+  pull_request:
+    paths:
+      - 'src/backend/cmd/collector/**'
+      - 'src/backend/internal/collector/**'
+      - 'src/backend/pkg/bronze/**'
+      - 'src/backend/Dockerfile'
+      - 'src/backend/go.mod'
+      - 'src/backend/go.sum'
+
+env:
+  GO_VERSION: '1.21'
+  DOCKER_BUILDKIT: '1'
+  SERVICE: 'collector'
+  MIN_THROUGHPUT: '1000'
+  MAX_LATENCY: '1'
+
+permissions:
+  id-token: write
+  contents: read
+  packages: write
+  security-events: write
+  deployments: write
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run unit tests with coverage
+        run: |
+          ./scripts/test.sh run_unit_tests
+        env:
+          TEST_COVERAGE_THRESHOLD: 80
+          GO_TEST_FLAGS: "-v -race -timeout=30m -parallel=4"
+
+      - name: Run integration tests
+        run: |
+          ./scripts/test.sh run_integration_tests
+        env:
+          TEST_TIMEOUT: "15m"
+
+      - name: Run performance tests
+        run: |
+          ./scripts/test.sh run_performance_tests
+        env:
+          PERFORMANCE_TEST_DURATION: "10m"
+          LOAD_TEST_CLIENTS: "100"
+          BRONZE_LATENCY_THRESHOLD: "1s"
+          EVENTS_PER_SECOND_THRESHOLD: "1000"
+
+      - name: Upload test coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: test-results/coverage/
+
+      - name: Store performance metrics
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-metrics
+          path: test-results/performance/
+
+  build:
+    name: Build and Validate
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | \
+          docker login --username AWS --password-stdin ${{ secrets.ECR_REGISTRY }}
+
+      - name: Build multi-stage image
+        run: |
+          ./scripts/build.sh build_image \
+            --component=${{ env.SERVICE }} \
+            --registry=${{ secrets.ECR_REGISTRY }}
+
+      - name: Verify image size
+        run: |
+          size=$(docker image inspect ${{ secrets.ECR_REGISTRY }}/${{ env.SERVICE }}:latest --format='{{.Size}}')
+          max_size=78643200  # 75MB
+          if [ "$size" -gt "$max_size" ]; then
+            echo "Image size ($size bytes) exceeds limit ($max_size bytes)"
+            exit 1
+          fi
+
+      - name: Run Trivy security scan
+        uses: aquasecurity/trivy-action@v1
+        with:
+          image-ref: ${{ secrets.ECR_REGISTRY }}/${{ env.SERVICE }}:latest
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'HIGH,CRITICAL'
+
+      - name: Run Snyk security scan
+        uses: snyk/actions/docker@v1
+        with:
+          image: ${{ secrets.ECR_REGISTRY }}/${{ env.SERVICE }}:latest
+          args: --severity-threshold=high
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: Push image if checks pass
+        run: |
+          docker push ${{ secrets.ECR_REGISTRY }}/${{ env.SERVICE }}:latest
+          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            docker tag ${{ secrets.ECR_REGISTRY }}/${{ env.SERVICE }}:latest \
+                      ${{ secrets.ECR_REGISTRY }}/${{ env.SERVICE }}:${GITHUB_REF#refs/tags/}
+            docker push ${{ secrets.ECR_REGISTRY }}/${{ env.SERVICE }}:${GITHUB_REF#refs/tags/}
+          fi
+
+  deploy:
+    name: Deploy to Production
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: production
+      url: https://api.blackpoint.security
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ secrets.EKS_CLUSTER_NAME }} \
+                                  --region ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to EKS cluster
+        run: |
+          kubectl apply -f deploy/kubernetes/collector-deployment.yaml
+          kubectl apply -f deploy/kubernetes/configmaps.yaml
+
+      - name: Wait for rollout
+        run: |
+          kubectl rollout status deployment/blackpoint-collector -n blackpoint-system \
+                                                               --timeout=300s
+
+      - name: Verify pod health
+        run: |
+          kubectl wait --for=condition=ready pod -l app=blackpoint-collector \
+                                               -n blackpoint-system \
+                                               --timeout=300s
+
+      - name: Check resource metrics
+        run: |
+          kubectl top pod -l app=blackpoint-collector -n blackpoint-system
+
+      - name: Validate endpoint latency
+        run: |
+          for i in {1..10}; do
+            response_time=$(curl -o /dev/null -s -w "%{time_total}\n" \
+                          https://api.blackpoint.security/health)
+            if (( $(echo "$response_time > ${{ env.MAX_LATENCY }}" | bc -l) )); then
+              echo "Latency threshold exceeded: ${response_time}s"
+              exit 1
+            fi
+          done
+
+      - name: Monitor error rates
+        run: |
+          errors=$(kubectl logs -l app=blackpoint-collector -n blackpoint-system \
+                              --tail=1000 | grep -c "ERROR")
+          if [ "$errors" -gt 10 ]; then
+            echo "Error rate too high: $errors errors in last 1000 log lines"
+            exit 1
+          fi
