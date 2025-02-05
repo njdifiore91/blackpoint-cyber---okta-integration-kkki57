@@ -1,0 +1,48 @@
+# Kubernetes Service manifest for the Silver tier normalizer service
+# Version: v1.25+
+# Purpose: Provides internal access to event normalization capabilities with monitoring support
+apiVersion: v1
+kind: Service
+metadata:
+  name: normalizer
+  namespace: blackpoint-system
+  labels:
+    app: normalizer
+    tier: silver
+    component: data-processing
+    part-of: blackpoint-security
+    managed-by: kubernetes
+  annotations:
+    # Prometheus monitoring configuration
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+    # AWS load balancer configuration for HA
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+spec:
+  # Internal cluster access only
+  type: ClusterIP
+  ports:
+    # Main API endpoint for event normalization
+    - name: api
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    # Prometheus metrics endpoint
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+  # Pod selector for service endpoints
+  selector:
+    app: normalizer
+  # No session affinity for better load distribution
+  sessionAffinity: None
+  # Don't publish pods that aren't ready
+  publishNotReadyAddresses: false
+  # Topology-aware routing for HA
+  topologyKeys:
+    - "kubernetes.io/hostname"
+    - "topology.kubernetes.io/zone"
+    - "*"
