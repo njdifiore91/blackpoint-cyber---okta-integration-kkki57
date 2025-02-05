@@ -1,0 +1,162 @@
+# Prometheus Recording Rules for BlackPoint Security Integration Framework
+# Version: v2.45.0
+# Evaluation Interval: 1m
+# Scrape Interval: 15s
+
+groups:
+  # Event Processing Rate Rules
+  - name: event_rates
+    interval: 1m
+    rules:
+      # Bronze Tier Event Rates
+      - record: blackpoint_bronze_events_rate_5m
+        expr: |
+          sum by (client_id, integration_type) (
+            rate(blackpoint_events_processed_total{tier="bronze"}[5m])
+          )
+      
+      # Per-Integration Bronze Event Rates
+      - record: blackpoint_bronze_events_rate_by_integration_5m
+        expr: |
+          sum by (integration_type) (
+            rate(blackpoint_events_processed_total{tier="bronze"}[5m])
+          )
+
+      # Silver Tier Event Rates
+      - record: blackpoint_silver_events_rate_5m
+        expr: |
+          sum by (client_id, integration_type) (
+            rate(blackpoint_events_processed_total{tier="silver"}[5m])
+          )
+      
+      # Per-Integration Silver Event Rates
+      - record: blackpoint_silver_events_rate_by_integration_5m
+        expr: |
+          sum by (integration_type) (
+            rate(blackpoint_events_processed_total{tier="silver"}[5m])
+          )
+
+      # Gold Tier Event Rates
+      - record: blackpoint_gold_events_rate_5m
+        expr: |
+          sum by (client_id, integration_type) (
+            rate(blackpoint_events_processed_total{tier="gold"}[5m])
+          )
+      
+      # Per-Integration Gold Event Rates
+      - record: blackpoint_gold_events_rate_by_integration_5m
+        expr: |
+          sum by (integration_type) (
+            rate(blackpoint_events_processed_total{tier="gold"}[5m])
+          )
+
+  # Processing Latency Rules
+  - name: latencies
+    interval: 1m
+    rules:
+      # Bronze Tier Latency (SLA: <1s)
+      - record: blackpoint_bronze_latency_p95_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (client_id, integration_type, le) (
+              rate(blackpoint_processing_duration_seconds_bucket{tier="bronze"}[5m])
+            )
+          )
+
+      # Silver Tier Latency (SLA: <5s)
+      - record: blackpoint_silver_latency_p95_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (client_id, integration_type, le) (
+              rate(blackpoint_processing_duration_seconds_bucket{tier="silver"}[5m])
+            )
+          )
+
+      # Gold Tier Latency (SLA: <30s)
+      - record: blackpoint_gold_latency_p95_5m
+        expr: |
+          histogram_quantile(0.95,
+            sum by (client_id, integration_type, le) (
+              rate(blackpoint_processing_duration_seconds_bucket{tier="gold"}[5m])
+            )
+          )
+
+      # SLA Compliance Rates
+      - record: blackpoint_sla_compliance_ratio_5m
+        expr: |
+          sum by (tier) (
+            rate(blackpoint_processing_duration_seconds_count{tier="bronze"}[5m]) *
+            (blackpoint_bronze_latency_p95_5m < 1)
+            or
+            rate(blackpoint_processing_duration_seconds_count{tier="silver"}[5m]) *
+            (blackpoint_silver_latency_p95_5m < 5)
+            or
+            rate(blackpoint_processing_duration_seconds_count{tier="gold"}[5m]) *
+            (blackpoint_gold_latency_p95_5m < 30)
+          )
+          /
+          sum by (tier) (
+            rate(blackpoint_processing_duration_seconds_count[5m])
+          )
+
+  # Resource Utilization Rules
+  - name: resource_utilization
+    interval: 1m
+    rules:
+      # CPU Utilization
+      - record: blackpoint_cpu_utilization_5m
+        expr: |
+          sum by (namespace, pod) (
+            rate(container_cpu_usage_seconds_total{container!=""}[5m])
+          ) /
+          sum by (namespace, pod) (
+            container_spec_cpu_quota{container!=""}
+          ) * 100
+
+      # Memory Utilization
+      - record: blackpoint_memory_utilization_5m
+        expr: |
+          sum by (namespace, pod) (
+            container_memory_working_set_bytes{container!=""}
+          ) /
+          sum by (namespace, pod) (
+            container_spec_memory_limit_bytes{container!=""}
+          ) * 100
+
+      # Disk Utilization
+      - record: blackpoint_disk_utilization_5m
+        expr: |
+          sum by (namespace, pod) (
+            container_fs_usage_bytes{container!=""}
+          ) /
+          sum by (namespace, pod) (
+            container_fs_limit_bytes{container!=""}
+          ) * 100
+
+      # Resource Saturation Prediction
+      - record: blackpoint_resource_saturation_prediction_6h
+        expr: |
+          predict_linear(blackpoint_cpu_utilization_5m[6h], 3600 * 24)
+
+  # System Health Rules
+  - name: system_health
+    interval: 1m
+    rules:
+      # Component Health Score
+      - record: blackpoint_component_health_score_5m
+        expr: |
+          (
+            sum by (component) (up{job=~"blackpoint-.*"}) +
+            sum by (component) (1 - (blackpoint_cpu_utilization_5m > 80)) +
+            sum by (component) (1 - (blackpoint_memory_utilization_5m > 80))
+          ) / 3 * 100
+
+      # Integration Success Rate
+      - record: blackpoint_integration_success_rate_5m
+        expr: |
+          sum by (integration_type) (
+            rate(blackpoint_integration_operations_total{status="success"}[5m])
+          ) /
+          sum by (integration_type) (
+            rate(blackpoint_integration_operations_total[5m])
+          ) * 100
