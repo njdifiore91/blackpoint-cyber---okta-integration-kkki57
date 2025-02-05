@@ -1,0 +1,227 @@
+_format_version: "2.1"
+_transform: true
+
+services:
+  # Bronze tier service configuration
+  - name: bronze-service
+    url: http://collector-service:8080
+    protocol: http
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 5
+    routes:
+      - name: bronze-route
+        paths:
+          - /api/v1/bronze
+        methods:
+          - POST
+          - GET
+        strip_path: false
+        preserve_host: true
+        protocols:
+          - https
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: kid
+          claims_to_verify:
+            - exp
+            - nbf
+            - iss
+            - sub
+          maximum_expiration: 3600
+      - name: rate-limiting
+        config:
+          minute: 1000
+          policy: redis
+          fault_tolerant: true
+          hide_client_headers: false
+          redis_host: redis
+          redis_port: 6379
+          redis_timeout: 2000
+
+  # Silver tier service configuration
+  - name: silver-service
+    url: http://normalizer-service:8080
+    protocol: http
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 3
+    routes:
+      - name: silver-route
+        paths:
+          - /api/v1/silver
+        methods:
+          - GET
+        strip_path: false
+        preserve_host: true
+        protocols:
+          - https
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: kid
+          claims_to_verify:
+            - exp
+            - nbf
+            - iss
+            - sub
+          maximum_expiration: 3600
+      - name: rate-limiting
+        config:
+          minute: 100
+          policy: redis
+          fault_tolerant: true
+          hide_client_headers: false
+          redis_host: redis
+          redis_port: 6379
+          redis_timeout: 2000
+
+  # Gold tier service configuration
+  - name: gold-service
+    url: http://analyzer-service:8080
+    protocol: http
+    connect_timeout: 60000
+    write_timeout: 60000
+    read_timeout: 60000
+    retries: 2
+    routes:
+      - name: gold-route
+        paths:
+          - /api/v1/gold
+        methods:
+          - GET
+          - POST
+          - PUT
+        strip_path: false
+        preserve_host: true
+        protocols:
+          - https
+    plugins:
+      - name: jwt
+        config:
+          key_claim_name: kid
+          claims_to_verify:
+            - exp
+            - nbf
+            - iss
+            - sub
+          maximum_expiration: 3600
+      - name: rate-limiting
+        config:
+          minute: 50
+          policy: redis
+          fault_tolerant: true
+          hide_client_headers: false
+          redis_host: redis
+          redis_port: 6379
+          redis_timeout: 2000
+
+# Global plugins applied to all services
+plugins:
+  - name: cors
+    config:
+      origins:
+        - https://*.blackpoint.com
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+        - OPTIONS
+      headers:
+        - Authorization
+        - Content-Type
+        - X-Request-ID
+      exposed_headers:
+        - X-Auth-Token
+        - X-Request-ID
+      credentials: true
+      max_age: 3600
+      preflight_continue: false
+
+  - name: prometheus
+    config:
+      status_codes: true
+      latency: true
+      bandwidth: true
+      per_consumer: true
+      upstream_health: true
+      per_workspace: true
+
+  - name: request-transformer
+    config:
+      add:
+        headers:
+          - X-Request-ID:$(uuid)
+          - X-Real-IP:$(remote_addr)
+          - X-Forwarded-For:$(http_x_forwarded_for)
+
+  - name: response-transformer
+    config:
+      add:
+        headers:
+          - X-Kong-Proxy-Latency:${latency}
+          - Strict-Transport-Security:max-age=31536000; includeSubDomains
+          - X-Frame-Options:DENY
+          - X-Content-Type-Options:nosniff
+          - X-XSS-Protection:1; mode=block
+          - Content-Security-Policy:default-src 'self'
+
+  - name: waf
+    config:
+      enabled_rules:
+        - owasp_crs
+      anomaly_score_threshold: 5
+      mode: BLOCKING
+      debug: false
+      ignore_rule_ids: []
+
+# Upstream configuration for service discovery
+upstreams:
+  - name: collector-service
+    algorithm: round-robin
+    healthchecks:
+      active:
+        http_path: /health
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 5
+          http_failures: 2
+    targets:
+      - target: collector-service:8080
+        weight: 100
+
+  - name: normalizer-service
+    algorithm: round-robin
+    healthchecks:
+      active:
+        http_path: /health
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 5
+          http_failures: 2
+    targets:
+      - target: normalizer-service:8080
+        weight: 100
+
+  - name: analyzer-service
+    algorithm: round-robin
+    healthchecks:
+      active:
+        http_path: /health
+        healthy:
+          interval: 5
+          successes: 2
+        unhealthy:
+          interval: 5
+          http_failures: 2
+    targets:
+      - target: analyzer-service:8080
+        weight: 100
