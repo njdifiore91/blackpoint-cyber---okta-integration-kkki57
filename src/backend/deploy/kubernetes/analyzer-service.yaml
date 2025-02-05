@@ -1,0 +1,51 @@
+# Kubernetes Service configuration for the analyzer component (v1.25+)
+# Handles security intelligence generation, threat detection, and alert management
+# in the Gold tier of the BlackPoint Security Integration Framework
+apiVersion: v1
+kind: Service
+
+metadata:
+  name: analyzer-service
+  namespace: blackpoint-system
+  labels:
+    app: blackpoint
+    component: analyzer
+    tier: gold
+    part-of: security-intelligence
+    version: v1
+  annotations:
+    # Prometheus monitoring configuration
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+    prometheus.io/scheme: "http"
+    # AWS load balancer optimizations
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-connection-draining-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-connection-draining-timeout: "60"
+
+spec:
+  type: ClusterIP
+  ports:
+    # Main API endpoint
+    - name: api
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+    # Metrics endpoint for Prometheus monitoring
+    - name: metrics
+      port: 9090
+      targetPort: 9090
+      protocol: TCP
+  # Pod selector labels matching analyzer-deployment
+  selector:
+    app: blackpoint
+    component: analyzer
+  # Session handling configuration
+  sessionAffinity: None
+  publishNotReadyAddresses: false
+  # Topology-aware routing configuration
+  topologyKeys:
+    - "kubernetes.io/hostname"
+    - "topology.kubernetes.io/zone"
+    - "*"
